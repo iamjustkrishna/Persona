@@ -23,7 +23,7 @@ interface QuoteApi {
 
 suspend fun fetchRemoteBaseUrl(): String? = withContext(Dispatchers.IO) {
     try {
-        val url = URL("https://raw.githubusercontent.com/thekrishnajeena/KrishnaJeena/refs/heads/main/config_persona.json")
+        val url = URL("https://raw.githubusercontent.com/iamjustkrishna/KrishnaJeena/refs/heads/main/config_persona.json")
         val connection = url.openConnection() as HttpURLConnection
         connection.connect()
 
