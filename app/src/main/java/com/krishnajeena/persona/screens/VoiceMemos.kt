@@ -14,30 +14,41 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -54,6 +65,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,78 +85,112 @@ fun VoiceMemosScreen() {
     var showSaveDialog by remember { mutableStateOf(false) }
     var recordings by remember { mutableStateOf(listOf<AudioFile>()) }
     var showTooltip by remember { mutableStateOf(false) }
-    var permissionToRecordAudio by remember { mutableStateOf(false) }
 
-    permissionToRecordAudio = handleVoicePermissions(context)
+    // Permission handling logic preserved
+    val permissionToRecordAudio = handleVoicePermissions(context)
+
+    // Smooth color and scale animations for the FAB
+    val pulseScale by animateFloatAsState(targetValue = if (isRecording) 1.3f else 1f, label = "pulse")
+    val fabColor by animateColorAsState(
+        targetValue = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        label = "color"
+    )
 
     LaunchedEffect(Unit) {
         recordings = audioRecorder.getRecordings()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        RecordingsList(recordings, Modifier.fillMaxSize()){ deletedFile ->
-            recordings = recordings.filter { it != deletedFile } // Refresh the list after deletion
-        }
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
 
-        FloatingActionButton(
-            onClick = {
-                showTooltip = true
-            },
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 160.dp)
-                .pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            when (event.type) {
-                                PointerEventType.Press -> {
-                                    if (permissionToRecordAudio) {
-                                        isRecording = true
-                                        audioRecorder.startRecording()
-                                    }
-                                }
-                                PointerEventType.Release -> {
-                                    if (isRecording) {
-                                        isRecording = false
-                                        try {
-                                            audioRecorder.stopRecording()
-                                            showSaveDialog = true
-                                        } catch (e: RuntimeException) {
-                                            Log.e("AudioRecorder", "Error stopping recording", e)
-                                            // Handle error gracefully, e.g., delete incomplete file or notify user
+            Column(modifier = Modifier.fillMaxSize()) {
+                // 1. BRANDED HEADER
+                Text(
+                    text = "Voice Memos",
+                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
+                )
+
+                // 2. RECORDINGS LIST (Logic preserved)
+                RecordingsList(
+                    recordings = recordings,
+                    modifier = Modifier.weight(1f)
+                ) { deletedFile ->
+                    recordings = recordings.filter { it != deletedFile }
+                }
+            }
+
+            // 3. THE "STUDIO" RECORDING BUTTON
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 160.dp), // Matches your navigation clearance
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Tooltip logic preserved but visually improved
+                AnimatedVisibility(visible = showTooltip || isRecording) {
+                    Text(
+                        text = if (isRecording) "Recording..." else "Hold to record",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                FloatingActionButton(
+                    onClick = { showTooltip = true },
+                    modifier = Modifier
+                        .size(72.dp)
+                        .scale(pulseScale)
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    when (event.type) {
+                                        PointerEventType.Press -> {
+                                            if (permissionToRecordAudio) {
+                                                isRecording = true
+                                                audioRecorder.startRecording()
+                                            }
+                                        }
+                                        PointerEventType.Release -> {
+                                            if (isRecording) {
+                                                isRecording = false
+                                                try {
+                                                    audioRecorder.stopRecording()
+                                                    showSaveDialog = true
+                                                } catch (e: RuntimeException) {
+                                                    Log.e("AudioRecorder", "Stop Error", e)
+                                                }
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                    }
+                        },
+                    containerColor = fabColor,
+                    contentColor = Color.White,
+                    shape = CircleShape,
+                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp)
+                    )
                 }
-                .scale(if (isRecording) 1.2f else 1f), // Animate size change when recording
-            containerColor = if (isRecording) Color.Red else MaterialTheme.colorScheme.primary // Change color when recording
-        ) {
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = if (isRecording) "Stop Recording" else "Start Recording",
-                tint = Color.White,
-                modifier = Modifier.size(36.dp)
-            )
-        }
-
-
-        if (showTooltip) {
-            TooltipBox(
-                text = "Hold to record, release to stop",
-                modifier = Modifier.align(Alignment.BottomCenter)
-                    .padding(bottom = 180.dp)
-            )
-            LaunchedEffect(showTooltip) {
-                delay(2000)
-                showTooltip = false
             }
         }
     }
 
+    // 4. DIALOGS (Logic preserved)
     if (showSaveDialog) {
         SaveAudioDialog(
             onDismiss = {
@@ -154,13 +200,22 @@ fun VoiceMemosScreen() {
             onSave = { fileName ->
                 audioRecorder.saveRecording(fileName).let {
                     recordings = audioRecorder.getRecordings()
-                    Toast.makeText(context, "Audio saved successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Memo secured", Toast.LENGTH_SHORT).show()
                 }
                 showSaveDialog = false
             }
         )
     }
+
+    // Auto-hide tooltip logic preserved
+    LaunchedEffect(showTooltip) {
+        if (showTooltip) {
+            delay(2000)
+            showTooltip = false
+        }
+    }
 }
+
 
 @Composable
 fun RecordingsList(recordings: List<AudioFile>, modifier: Modifier = Modifier, onDelete: (AudioFile) -> Unit) {

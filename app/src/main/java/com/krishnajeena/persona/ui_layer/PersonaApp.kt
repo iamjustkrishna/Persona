@@ -340,19 +340,22 @@ fun PersonaApp(viewModel: CameraPhotoViewModel = viewModel(),
                 .fillMaxSize()
             ) {
 
-                composable(BottomNavItem.Explore.route) { ExploreScreen(onCategoryClick = {
-                        blogList, name ->
-                    categoryBlogViewModel.setBlogs(blogList)
-                    categoryBlogViewModel.setName(name)
-                    navController.navigate(BottomNavItem.BlogsOfCategory.route)
-
+                composable(BottomNavItem.Explore.route) {
+                    ExploreScreen(
+                        onCategoryClick = { blogList, name ->
+                            // This handles navigation to your existing "BlogsOfCategory" screen
+                            categoryBlogViewModel.setBlogs(blogList)
+                            categoryBlogViewModel.setName(name)
+                            navController.navigate(BottomNavItem.BlogsOfCategory.route)
+                        },
+                        navController = navController
+                    )
                 }
-                    , navController = navController) }
 
                 composable(BottomNavItem.ReelStack.route) { ReelScreen() }
                 composable(BottomNavItem.Clicks.route,
                     deepLinks = listOf(navDeepLink { uriPattern = "app://com.krishnajeena.persona/clicks" })) { DailyCameraScreen(navController, cameraClickViewModel) }
-                composable(BottomNavItem.Study.route) { StudyScreen() }
+                composable(BottomNavItem.Study.route) { StudyScreen(navController) }
                 composable(BottomNavItem.Tools.route) { ToolsScreen() }
                 composable(BottomNavItem.Music.route){
                     val sharedViewModel: SharedViewModel = hiltViewModel()

@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
@@ -47,6 +48,7 @@ import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -55,6 +57,8 @@ import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberSwipeToDismissBoxState
@@ -66,9 +70,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -95,74 +101,50 @@ import java.net.URLConnection
 @RequiresApi(Build.VERSION_CODES.R)
 
 @Composable
-fun StudyScreen() {
-    var showBottomSheet by remember { mutableStateOf(false) }
-    var isWebOpen by remember { mutableStateOf(false) }
+fun StudyScreen(
+    navController: NavHostController, // Passed from Main Nav to avoid nesting
+    blogUrlViewModel: BlogUrlViewModel = hiltViewModel()
+) {
+    val tabTitles = listOf("The Vault", "My Notes", "Books")
+    val pagerState = rememberPagerState(pageCount = { tabTitles.size })
+    val scope = rememberCoroutineScope()
 
-    val context = LocalContext.current
-    val navController = rememberNavController()
+    Column(modifier = Modifier.fillMaxSize()) {
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-    ) { _ ->
-
-        NavHost(
-            navController = navController,
-            startDestination = "blogs",
-            modifier = Modifier.fillMaxSize()
+        // 2. CLEAN TAB ROW
+        TabRow(
+            selectedTabIndex = pagerState.currentPage,
+            containerColor = Color.Transparent,
+            contentColor = MaterialTheme.colorScheme.primary,
+            indicator = { tabPositions ->
+                TabRowDefaults.SecondaryIndicator(
+                    Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            },
+            divider = {}
         ) {
-            composable("blogs") {
-                isWebOpen = false
-                val tabTitles = listOf("My Blogs", "My Notes", "Books")
-                val pagerState = rememberPagerState(initialPage = 0,
-                    pageCount = { tabTitles.size })
-                val coroutineScope = rememberCoroutineScope()
-
-                Column(modifier = Modifier.fillMaxSize()) {
-                    TabRow(selectedTabIndex = pagerState.currentPage) {
-                        tabTitles.forEachIndexed { index, title ->
-                            Tab(
-                                selected = pagerState.currentPage == index,
-                                onClick = {
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(index)
-                                    }
-                                },
-                                text = { Text(title) }
-                            )
-                        }
+            tabTitles.forEachIndexed { index, title ->
+                Tab(
+                    selected = pagerState.currentPage == index,
+                    onClick = { scope.launch { pagerState.animateScrollToPage(index) } },
+                    text = {
+                        Text(title, style = MaterialTheme.typography.titleSmall)
                     }
-
-                    HorizontalPager(
-                        state = pagerState,
-                        modifier = Modifier.weight(1f)
-                    ) { page ->
-                        when (page) {
-                            0 -> MyBlogsSection(
-                                setShowBottomSheet = { showBottomSheet = it },
-                                isWebOpen = isWebOpen,
-                                navController = navController,
-                                context = context
-                            )
-                            1 -> NotesScreen()
-                            2-> BooksScreen()
-                        }
-                    }
-                }
+                )
             }
+        }
 
-            composable(
-                "webView/{url}",
-                arguments = listOf(navArgument("url") {
-                    type = NavType.StringType
-                    nullable = true
-                })
-            ) { backStackEntry ->
-                WebViewItem(url = backStackEntry.arguments?.getString("url") ?: "https://www.google.com/",
-                    navController)
-                isWebOpen = true
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.weight(1f),
+            userScrollEnabled = true
+        ) { page ->
+            when (page) {
+                0 -> VaultSection(blogUrlViewModel, navController)
+                1 -> NotesScreen()
+                2 -> BooksScreen()
             }
-
         }
     }
 }

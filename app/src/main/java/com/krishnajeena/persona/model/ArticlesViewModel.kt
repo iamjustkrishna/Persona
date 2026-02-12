@@ -16,11 +16,7 @@ import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.request.get
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.coroutines.launch
-data class SummaryState(
-    val content: String? = null,
-    val isLoading: Boolean = false,
-    val error: String? = null
-)
+
 
 class ArticlesViewModel : ViewModel() {
 
@@ -94,6 +90,7 @@ class ArticlesViewModel : ViewModel() {
     /**
      * Resets the summary state when the user closes the bottom sheet.
      */
+
     fun clearSummary() {
         summaryState = SummaryState()
     }

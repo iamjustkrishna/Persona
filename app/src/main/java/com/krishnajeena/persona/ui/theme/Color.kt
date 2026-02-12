@@ -17,10 +17,8 @@ val errorLight = Color(0xFFBA1A1A)
 val onErrorLight = Color(0xFFFFFFFF)
 val errorContainerLight = Color(0xFFFFDAD6)
 val onErrorContainerLight = Color(0xFF93000A)
-val backgroundLight = Color(0xFFF9F9FF)
 val onBackgroundLight = Color(0xFF191C20)
-val surfaceLight = Color(0xFFF9F9FF)
-val onSurfaceLight = Color(0xFF191C20)
+
 val surfaceVariantLight = Color(0xFFE0E2EC)
 val onSurfaceVariantLight = Color(0xFF44474E)
 val outlineLight = Color(0xFF74777F)
@@ -125,10 +123,8 @@ val errorDark = Color(0xFFFFB4AB)
 val onErrorDark = Color(0xFF690005)
 val errorContainerDark = Color(0xFF93000A)
 val onErrorContainerDark = Color(0xFFFFDAD6)
-val backgroundDark = Color(0xFF111318)
 val onBackgroundDark = Color(0xFFE2E2E9)
-val surfaceDark = Color(0xFF111318)
-val onSurfaceDark = Color(0xFFE2E2E9)
+
 val surfaceVariantDark = Color(0xFF44474E)
 val onSurfaceVariantDark = Color(0xFFC4C6D0)
 val outlineDark = Color(0xFF8E9099)
@@ -217,7 +213,20 @@ val surfaceContainerDarkHighContrast = Color(0xFF2E3036)
 val surfaceContainerHighDarkHighContrast = Color(0xFF393B41)
 val surfaceContainerHighestDarkHighContrast = Color(0xFF45474C)
 
+// Brand Accents
+val PrimaryIndigo = Color(0xFF4F46E5)    // The "Action" color
+val SecondarySlate = Color(0xFF475569)   // The "Stability" color
+val TertiaryGold = Color(0xFFD97706)     // The "Premium/Insight" color
 
+// Light Palette
+val backgroundLight = Color(0xFFF8FAFC)
+val surfaceLight = Color(0xFFFFFFFF)
+val onSurfaceLight = Color(0xFF0F172A)
+
+// Dark Palette
+val backgroundDark = Color(0xFF0F172A)
+val surfaceDark = Color(0xFF1E293B)
+val onSurfaceDark = Color(0xFFF8FAFC)
 
 
 
