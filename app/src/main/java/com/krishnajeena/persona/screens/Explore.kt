@@ -2,7 +2,10 @@ package com.krishnajeena.persona.screens
 
 import android.net.Uri
 import android.util.Log
+import android.widget.Toast
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -11,6 +14,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,15 +34,22 @@ import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
 import androidx.compose.foundation.lazy.staggeredgrid.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.Article
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.rounded.Article
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BookmarkAdd
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.FormatQuote
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +62,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -64,10 +76,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -79,6 +93,7 @@ import com.krishnajeena.persona.R
 import com.krishnajeena.persona.data_layer.ArticleEntity
 import com.krishnajeena.persona.data_layer.BlogCategory
 import com.krishnajeena.persona.data_layer.BlogItem
+import com.krishnajeena.persona.model.BlogUrlViewModel
 import com.krishnajeena.persona.model.ExploreViewModel
 
 @Composable
@@ -160,18 +175,7 @@ fun ExploreHeaderSection(
     Column {
         Text("Discover", style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold)
 
-        // 1. TOP CATEGORIES (Image items that navigate to a new screen)
-//        LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-//            items(categories) { category ->
-//                BlogsCategoryItem(
-//                    title = category.name,
-//                    image = category.image,
-//                    onClick = { onCategoryItemClick(category) }
-//                )
-//            }
-//        }
-
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(5.dp))
 
         // 2. TRENDING CHIPS (Filter the current Staggered Grid)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -183,36 +187,47 @@ fun ExploreHeaderSection(
                 )
             }
         }
-
-        HorizontalDivider(Modifier.padding(vertical = 12.dp))
     }
 }
 
 @Composable
 fun ExploreScreen(
     navController: NavHostController,
-    onCategoryClick: (List<BlogItem>, String) -> Unit, // Re-inserted this!
-    viewModel: ExploreViewModel = hiltViewModel()
+    onCategoryClick: (List<BlogItem>, String) -> Unit,
+    viewModel: ExploreViewModel = hiltViewModel(),
+    blogUrlViewModel: BlogUrlViewModel = hiltViewModel() // Use your existing ViewModel
 ) {
-    // 1. OBSERVE UNIFIED STATE
     val isConnected by viewModel.isConnected.collectAsState()
     val isLoading = viewModel.isLoading
     val selectedTag = viewModel.selectedCategory
     val feed = viewModel.combinedFeed
     val summaryState = viewModel.summaryState
+    val errorMessage = viewModel.errorMessage
 
     var showSummarySheet by remember { mutableStateOf(false) }
+
+    // 1. Store only the data we need for the Vault
+    var activeTitle by remember { mutableStateOf("") }
+    var activeUrl by remember { mutableStateOf("") }
 
     Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
         if (!isConnected) {
             OfflineView()
+        } else if (errorMessage != null && feed.isEmpty()) {
+            NetworkErrorView(
+                message = errorMessage,
+                onRetry = { viewModel.retryFetch() }
+            )
         } else {
-            // 2. AI SUMMARY SHEET
+            // 2. THE SUMMARY SHEET
             if (showSummarySheet) {
                 ArticleSummarySheet(
+                    articleTitle = activeTitle,
+                    articleUrl = activeUrl,
                     summary = summaryState.content,
                     isLoading = summaryState.isLoading,
                     error = summaryState.error,
+                    blogUrlViewModel = blogUrlViewModel, // Connecting to your Vault
                     onDismiss = {
                         showSummarySheet = false
                         viewModel.clearSummary()
@@ -227,7 +242,6 @@ fun ExploreScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalItemSpacing = 12.dp
             ) {
-                // 3. HEADER SECTION
                 item(span = StaggeredGridItemSpan.FullLine) {
                     ExploreHeaderSection(
                         categories = viewModel.categories,
@@ -240,28 +254,34 @@ fun ExploreScreen(
                     )
                 }
 
-                // 4. FEED CONTENT (Interleaved automatically by ViewModel)
                 if (isLoading && feed.isEmpty()) {
                     items(6) { ShimmerCard() }
                 } else {
                     items(feed, key = { it.url }) { article ->
+                        // 3. Logic for clicking the card vs clicking summarize
+                        val cardOnClick = {
+                            navController.navigate("webView/${Uri.encode(article.url)}")
+                        }
+
+                        val onSummarize = {
+                            // Capture metadata before opening the sheet
+                            activeTitle = article.title
+                            activeUrl = article.url
+                            showSummarySheet = true
+                            viewModel.summarizeArticle(article.url)
+                        }
+
                         if (article.source == "founder") {
                             FounderInsightCard(
                                 article = article,
-                                onSummarizeClick = {
-                                    showSummarySheet = true
-                                    viewModel.summarizeArticle(article.url)
-                                },
-                                onClick = { navController.navigate("webview/${Uri.encode(article.url)}") }
+                                onSummarizeClick = onSummarize,
+                                onClick = cardOnClick
                             )
                         } else {
                             ExploreArticleCard(
                                 article = article,
-                                onSummarizeClick = {
-                                    showSummarySheet = true
-                                    viewModel.summarizeArticle(article.url)
-                                },
-                                onClick = { navController.navigate("webview/${Uri.encode(article.url)}") }
+                                onSummarizeClick = onSummarize,
+                                onClick = cardOnClick
                             )
                         }
                     }
@@ -271,48 +291,152 @@ fun ExploreScreen(
     }
 }
 
+
+@Composable
+fun NetworkErrorView(message: String, onRetry: () -> Unit) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.4f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "alpha"
+    )
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.CloudOff,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp).graphicsLayer(alpha = alpha),
+            tint = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "Connection is Weak",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp)
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onRetry,
+            modifier = Modifier.fillMaxWidth(0.7f).height(50.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+        ) {
+            Icon(Icons.Rounded.Refresh, contentDescription = null)
+            Spacer(Modifier.width(8.dp))
+            Text("Try Again", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArticleSummarySheet(
+    articleTitle: String,   // The title of the article being summarized
+    articleUrl: String,     // The source URL to save
     summary: String?,
     isLoading: Boolean,
     error: String?,
+    blogUrlViewModel: BlogUrlViewModel, // Pass your existing ViewModel here
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    // Check if this specific URL is already in the database
+    val isSaved = remember(articleUrl, blogUrlViewModel.urls.size) {
+        blogUrlViewModel.isAlreadyAdded(articleUrl)
+    }
+
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
-        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+        shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     ) {
-        Column(modifier = Modifier.fillMaxWidth().padding(24.dp).padding(bottom = 24.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(top = 8.dp, bottom = 32.dp)
+        ) {
+            // 1. HEADER
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+                Icon(Icons.Rounded.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Text("Persona Intelligence", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.ExtraBold)
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
-            when {
-                isLoading -> {
-                    ShimmerEffect(modifier = Modifier.fillMaxWidth().height(150.dp).clip(RoundedCornerShape(16.dp)))
-                }
-                error != null -> {
-                    Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
-                }
-                else -> {
-                    Text(
-                        text = summary ?: "No analysis available.",
-                        style = MaterialTheme.typography.bodyLarge,
-                        lineHeight = 24.sp
-                    )
-                    Button(
-                        onClick = { /* TODO: Save to Vault */ },
-                        modifier = Modifier.padding(top = 24.dp).fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Text("Add to Study Vault")
+            // 2. SCROLLABLE CONTENT
+            Box(modifier = Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                when {
+                    isLoading -> {
+                        ShimmerEffect(modifier = Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(16.dp)))
                     }
+                    error != null -> {
+                        Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
+                    }
+                    else -> {
+                        Text(
+                            text = summary ?: "No analysis available.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            lineHeight = 26.sp
+                        )
+                    }
+                }
+            }
+
+            // 3. THE "STUDY VAULT" ACTION BUTTON
+            if (!isLoading && error == null) {
+                Button(
+                    onClick = {
+                        if (!isSaved) {
+                            val formatted = formatUrl(articleUrl)
+                            if (formatted != null) {
+                                blogUrlViewModel.addUrl(articleTitle, formatted)
+                                Toast.makeText(context, "Secured in Vault!", Toast.LENGTH_SHORT).show()
+                                onDismiss() // Optional: close sheet after saving
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp)
+                        .height(56.dp),
+                    enabled = !isSaved, // Disable if already saved
+                    shape = RoundedCornerShape(16.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSaved) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isSaved) Icons.Rounded.CheckCircle else Icons.Rounded.BookmarkAdd,
+                        contentDescription = null
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = if (isSaved) "Already in Vault" else "Add to Study Vault",
+                        style = MaterialTheme.typography.titleMedium
+                    )
                 }
             }
         }
@@ -425,53 +549,38 @@ fun OfflineView() {
 
 @Composable
 fun ShimmerEffect(
-    modifier: Modifier,
-    widthOfShadowBrush: Int = 500,
-    angleOfAxisY: Float = 270f,
-    durationMillis: Int = 1000,
+    modifier: Modifier = Modifier
 ) {
-
+    // 1. Define colors based on the current theme
+    val isDark = isSystemInDarkTheme()
 
     val shimmerColors = listOf(
-        Color.White.copy(alpha = 0.3f),
-        Color.White.copy(alpha = 0.5f),
-        Color.White.copy(alpha = 1.0f),
-        Color.White.copy(alpha = 0.5f),
-        Color.White.copy(alpha = 0.3f),
+        if (isDark) Color.DarkGray.copy(alpha = 0.6f) else Color.LightGray.copy(alpha = 0.9f),
+        if (isDark) Color.Gray.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.2f),
+        if (isDark) Color.DarkGray.copy(alpha = 0.6f) else Color.LightGray.copy(alpha = 0.9f),
     )
 
-    val transition = rememberInfiniteTransition(label = "")
-
-    val translateAnimation = transition.animateFloat(
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val translateAnim = transition.animateFloat(
         initialValue = 0f,
-        targetValue = (durationMillis + widthOfShadowBrush).toFloat(),
+        targetValue = 1000f,
         animationSpec = infiniteRepeatable(
-            animation = tween(
-                durationMillis = durationMillis,
-                easing = LinearEasing,
-            ),
-            repeatMode = RepeatMode.Restart,
+            animation = tween(durationMillis = 1000, easing = LinearOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
         ),
-        label = "Shimmer loading animation",
+        label = "translate"
     )
 
     val brush = Brush.linearGradient(
         colors = shimmerColors,
-        start = Offset(x = translateAnimation.value - widthOfShadowBrush, y = 0.0f),
-        end = Offset(x = translateAnimation.value, y = angleOfAxisY),
+        start = Offset.Zero,
+        end = Offset(x = translateAnim.value, y = translateAnim.value)
     )
 
+    // 2. Apply the brush to the modifier
     Box(
-        modifier = modifier
-    ) {
-        Spacer(
-            modifier = Modifier
-                .matchParentSize()
-                .background(brush)
-        )
-    }
-
-
+        modifier = modifier.background(brush)
+    )
 }
 
 @Composable

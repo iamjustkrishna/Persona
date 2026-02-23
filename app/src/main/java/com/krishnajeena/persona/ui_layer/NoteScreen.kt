@@ -23,27 +23,36 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.AutoStories
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.LibraryBooks
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -88,6 +97,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.krishnajeena.persona.model.NoteViewModel
@@ -98,75 +108,113 @@ fun NoteScreen(state: NoteState, onEvent: (NoteEvent) -> Unit) {
     var showBottomSheet by remember { mutableStateOf(false) }
 
     Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            FloatingActionButton(onClick = { showBottomSheet = true }) {
-                Icon(imageVector = Icons.Rounded.Add, contentDescription = null)
+            FloatingActionButton(
+                onClick = { showBottomSheet = true },
+                // Maintaining your 80dp clearance for bottom navigation
+                modifier = Modifier.padding(bottom = 80.dp),
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 6.dp)
+            ) {
+                Icon(imageVector = Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(28.dp))
             }
         },
-        floatingActionButtonPosition = FabPosition.Center,
-        modifier = Modifier.padding(bottom = 80.dp).background(Color.White)
+        floatingActionButtonPosition = FabPosition.Center
     ) { innerPadding ->
+
+        // 1. MAIN LAYOUT CONTAINER
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = innerPadding.calculateBottomPadding())
+                .statusBarsPadding() // Ensures header is below the notch
+        ) {
+
+            // 3. CANVAS AREA
+            Box(modifier = Modifier.weight(1f)) {
+                if (state.notes.isEmpty()) {
+                    EmptyNotesView() // Branded empty state we created earlier
+                } else {
+                    ZoomableCanvas(
+                        viewModel = hiltViewModel<NoteViewModel>(),
+                        modifier = Modifier
+                            .fillMaxSize()
+                            // Re-applying the dot-grid feel via color or drawing
+                            .background(MaterialTheme.colorScheme.background)
+                    )
+                }
+            }
+        }
+
+        // 4. BOTTOM SHEET (Logic preserved, UI improved)
         if (showBottomSheet) {
             val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
             val scope = rememberCoroutineScope()
 
             ModalBottomSheet(
                 sheetState = sheetState,
-                onDismissRequest = { showBottomSheet = false }
+                onDismissRequest = { showBottomSheet = false },
+                containerColor = MaterialTheme.colorScheme.surface,
+                dragHandle = { BottomSheetDefaults.DragHandle() }
             ) {
                 Column(
                     modifier = Modifier
-                        .padding(16.dp)
+                        .padding(horizontal = 24.dp)
+                        .padding(bottom = 48.dp)
                         .fillMaxWidth(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    Text(
+                        "New Thought",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.align(Alignment.Start).padding(bottom = 16.dp)
+                    )
+
                     OutlinedTextField(
                         value = state.title.value,
                         onValueChange = { state.title.value = it },
-                        label = { Text("Note Title") }
+                        label = { Text("Title") },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
                     OutlinedTextField(
                         value = state.discription.value,
                         onValueChange = { state.discription.value = it },
-                        label = { Text("Note Description") }
+                        label = { Text("Description") },
+                        modifier = Modifier.fillMaxWidth().height(120.dp),
+                        shape = RoundedCornerShape(12.dp)
                     )
-                    Spacer(modifier = Modifier.height(15.dp))
 
-                    OutlinedButton(onClick = {
-                        if (state.title.value.isNotBlank() && state.discription.value.isNotBlank()) {
-                            onEvent(NoteEvent.SaveNote(state.title.value, state.discription.value))
-                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                if (!sheetState.isVisible) showBottomSheet = false
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Button(
+                        onClick = {
+                            if (state.title.value.isNotBlank() && state.discription.value.isNotBlank()) {
+                                onEvent(NoteEvent.SaveNote(state.title.value, state.discription.value))
+                                scope.launch { sheetState.hide() }.invokeOnCompletion {
+                                    if (!sheetState.isVisible) showBottomSheet = false
+                                }
                             }
-                        }
-                    }) {
-                        Text("Add Note", fontSize = 15.sp)
+                        },
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = RoundedCornerShape(16.dp)
+                    ) {
+                        Text("Drop onto Canvas", style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
         }
-
-        Box(modifier = Modifier.fillMaxSize().padding(bottom = innerPadding.calculateBottomPadding(),
-            start = innerPadding.calculateStartPadding(LayoutDirection.Ltr),
-            end = innerPadding.calculateStartPadding(LayoutDirection.Ltr))) {
-            if (state.notes.isEmpty()) {
-                Image(
-                    painter = painterResource(R.drawable.undraw_taking_notes_re_bnaf),
-                    contentDescription = null,
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
-                ZoomableCanvas(
-                  viewModel = hiltViewModel<NoteViewModel>(),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Color(0xFFFAFAFA))
-                )
-            }
-        }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ZoomableCanvas(
@@ -380,3 +428,48 @@ fun ZoomableCanvas(
         }
     }
 }
+
+@Composable
+fun EmptyNotesView() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        // Using a built-in Icon with a soft background for a premium feel
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.LibraryBooks,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "add notes",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "try adding notes + icon",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp
+        )
+    }
+}
+

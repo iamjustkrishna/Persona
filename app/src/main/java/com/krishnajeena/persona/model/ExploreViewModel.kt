@@ -19,6 +19,7 @@ import com.krishnajeena.persona.network.RetrofitInstanceExploreArticle
 import com.krishnajeena.persona.network.RetrofitInstanceFounder
 import com.krishnajeena.persona.network.RetrofitInstanceGemini
 import com.krishnajeena.persona.network.SummaryRequest
+import com.krishnajeena.persona.network.fetchRemoteBaseUrl
 import com.krishnajeena.persona.other.NetworkMonitor
 import io.ktor.client.engine.cio.CIO
 
@@ -33,11 +34,15 @@ import io.ktor.util.InternalAPI
 
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.android.Android
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.supervisorScope
+import kotlin.coroutines.cancellation.CancellationException
 
 // Unified State for AI Summary
 data class SummaryState(
@@ -50,6 +55,14 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
     private val networkMonitor = NetworkMonitor(application.applicationContext)
     private val _isConnected = MutableStateFlow(true)
     val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    // Inside ExploreViewModel
+    private var fetchJob: Job? = null
+
+
+    // Add this state to your ViewModel
+    var errorMessage by mutableStateOf<String?>(null)
+        private set
 
     // --- UI STATES ---
     var categories by mutableStateOf<List<BlogCategory>>(emptyList())
@@ -115,45 +128,88 @@ class ExploreViewModel(application: Application) : AndroidViewModel(application)
             networkMonitor.isConnected.collect { connected ->
                 _isConnected.value = connected
                 if (connected && categories.isEmpty()) {
-                    fetchAllDiscoveryMetadata()
+                    safeStartSequence()
                 }
+            }
+        }
+    }
+
+    private fun safeStartSequence() {
+        viewModelScope.launch {
+            try {
+                // Call discovery metadata
+                fetchAllDiscoveryMetadata()
+
+                // Call your quote system safely
+                val quoteUrl = fetchRemoteBaseUrl()
+                if (quoteUrl == null) {
+                    Log.d("PERSONA", "Using local fallback for quotes")
+                }
+            } catch (e: Exception) {
+                Log.e("PERSONA", "Sequence failed but app is safe")
             }
         }
     }
 
     private fun fetchAllDiscoveryMetadata() {
-        viewModelScope.launch {
+        // 1. Cancel any previous attempt that might still be hanging
+        fetchJob?.cancel()
+
+        fetchJob = viewModelScope.launch {
             isLoading = true
+            errorMessage = null
+
             try {
-                // PARALLEL CALL 1: Get Categories & Founder Insights from GitHub
-                val categoriesDef = async { RetrofitInstance.api.getCategories() }
-                val tagsDef = async { RetrofitInstance.api.getArticlesCategories() }
-                val foundersDef = async { RetrofitInstanceFounder.api.getFounderArticles() }
+                // 2. Use supervisorScope to isolate parallel failures
+                supervisorScope {
+                    val categoriesDef = async { RetrofitInstance.api.getCategories() }
+                    val tagsDef = async { RetrofitInstance.api.getArticlesCategories() }
+                    val foundersDef = async { RetrofitInstanceFounder.api.getFounderArticles() }
 
-                val categoryRes = categoriesDef.await()
-                val tagsRes = tagsDef.await()
-                val founderDtos = foundersDef.await()
+                    // 3. Await all results
+                    val categoryRes = categoriesDef.await()
+                    val tagsRes = tagsDef.await()
+                    val founderDtos = foundersDef.await()
 
-                // ASSIGN METADATA
-                categories = categoryRes.categories
-                articlesCategories = tagsRes.articlesCategories
-                founderInsights = founderDtos.map { it.toEntity() }
-                Log.d("FOUNDERS: ", "$founderInsights")
+                    // Success! Assign data
+                    categories = categoryRes.categories
+                    articlesCategories = tagsRes.articlesCategories
+                    founderInsights = founderDtos.map { it.toEntity() }
 
-                if (articlesCategories.isNotEmpty()) {
-                    val initialTag = articlesCategories[0]
-                    selectedCategory = initialTag
-                    // PARALLEL CALL 2: Get initial articles from Dev.to
-                    fetchArticlesByTag(initialTag)
+                    if (articlesCategories.isNotEmpty()) {
+                        val initialTag = articlesCategories[0]
+                        selectedCategory = initialTag
+                        fetchArticlesByTag(initialTag)
+                    }
                 }
             } catch (e: Exception) {
-                Log.e("PERSONA_DEBUG", "Metadata Fetch Failed: ${e.message}")
+                // 4. CRITICAL: If the system is cancelling the job, don't update state
+                if (e is CancellationException) throw e
+
+                errorMessage = when (e) {
+                    is java.net.SocketTimeoutException -> "Connection too slow. Try moving to a better spot."
+                    else -> "Network error. Please check your signal."
+                }
+                Log.e("PERSONA_DEBUG", "Fetch Error: ${e.message}")
             } finally {
-                isLoading = false
+                // Only stop loading if we aren't just restarting the job
+                if (coroutineContext.isActive) {
+                    isLoading = false
+                }
             }
         }
     }
 
+    fun retryFetch() {
+        // Immediate feedback so the user doesn't keep clicking
+        if (isLoading) return
+
+        if (_isConnected.value) {
+            fetchAllDiscoveryMetadata()
+        } else {
+            errorMessage = "You are currently offline."
+        }
+    }
     fun onCategorySelected(tag: String) {
         if (selectedCategory != tag) {
             selectedCategory = tag

@@ -14,28 +14,39 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FabPosition
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxState
@@ -58,12 +69,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import androidx.navigation.NavController
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -79,179 +92,196 @@ import java.io.File
 
 @RequiresApi(Build.VERSION_CODES.R)
 @Composable
-fun BooksScreen() {
-
+fun BooksScreen(navController: NavHostController) {
     val context = LocalContext.current
-    val booksViewModel = BooksViewModel(context)
-
-    var isWebOpen by remember { mutableStateOf(false) }
-
+    // Ideally, provide this via Hilt, but keeping your logic intact:
+    val booksViewModel = remember { BooksViewModel(context) }
 
     val bookList by booksViewModel.pdfList.observeAsState(emptyList())
+
     val pdfPickerLauncher = rememberLauncherForActivityResult(
         contract = GetCustomContents(isMultiple = true),
         onResult = { uris ->
-            uris.forEach{
-                booksViewModel.savePdfToAppDirectory(context,  it)
-            }
-
+            uris.forEach { booksViewModel.savePdfToAppDirectory(context, it) }
         }
     )
 
-    Scaffold(modifier = Modifier.fillMaxSize(),
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
             FloatingActionButton(
-                onClick = {
-
-pdfPickerLauncher.launch(("application/pdf"))
-
-                },
-                elevation = FloatingActionButtonDefaults.elevation(0.dp),
-                modifier = Modifier.padding(bottom = 86.dp)
+                onClick = { pdfPickerLauncher.launch("application/pdf") },
+                modifier = Modifier.padding(bottom = 86.dp), // Clears bottom nav
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                shape = CircleShape
             ) {
-                Icon(imageVector = Icons.Default.Add,
-                    contentDescription = null)
+                Icon(Icons.Default.Add, contentDescription = "Add Book")
             }
-        }, floatingActionButtonPosition = FabPosition.Center
-        ){ _ ->
-Column(modifier = Modifier
-    .fillMaxSize()
-   ){
-
-    val navController = rememberNavController()
-
-    NavHost(navController, "listBook"){
-        composable("listBook"){
-isWebOpen = false
+        },
+        floatingActionButtonPosition = FabPosition.Center
+    ) { paddingValues ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = paddingValues.calculateBottomPadding())
+                .statusBarsPadding()
+        ) {
 
 
-            Column(modifier = Modifier.fillMaxSize()) {
+            // 2. BOOKS CONTENT
+            Box(modifier = Modifier.weight(1f)) {
+                val myBooksDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "Persona/MyBooks"
+                )
 
+                val downloadedBooks = remember {
+                    myBooksDir.listFiles()?.filter {
+                        it.extension == "pdf" || it.extension == "epub"
+                    } ?: emptyList()
+                }
 
-                            val myBooksDir = File(
-                                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                                "Persona/MyBooks"
-                            )
+                val allBooks = bookList + downloadedBooks
 
-                            val downloadedBooks = remember {
-                                myBooksDir.listFiles()?.filter {
-                                    it.extension == "pdf" || it.extension == "epub"
-                                } ?: emptyList()
-                            }
-
-// Combine both app-added books and downloaded ones
-                            val allBooks = bookList + downloadedBooks
-
-                            if (allBooks.isEmpty()) {
-                                Image(
-                                    painter = painterResource(R.drawable.undraw_reading_list_re_bk72),
-                                    contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
-                                    alignment = Alignment.Center
-                                )
-                            } else {
-                                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                                    itemsIndexed(
-                                        items = allBooks,
-                                        key = { _, book -> book.absolutePath }
-                                    ) { _, book ->
-                                        BookItem(book, booksViewModel, navController)
-                                    }
-                                }
-                            }
-
-            }
-
+                if (allBooks.isEmpty()) {
+                    EmptyLibraryView()
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp)
+                    ) {
+                        items(items = allBooks, key = { it.absolutePath }) { book ->
+                            BookListItem(book, booksViewModel, navController)
+                        }
                     }
-
-        composable("bookOpen/{bookName}",
-            arguments = listOf(navArgument("bookName"){
-                type = NavType.StringType
-            }))
-        {
-            backStackEntry ->
-            val bookName = backStackEntry.arguments?.getString("bookName")
-            if (bookName != null) {
-                PersonaPdfViewer(url = bookName)
+                }
             }
         }
-
-        composable(
-            "webView/{url}",
-            arguments = listOf(navArgument("url") {
-                type = NavType.StringType
-                nullable = true
-            })
-        ) { backStackEntry ->
-            WebViewItem(url = backStackEntry.arguments?.getString("url") ?: "https://www.google.com/",
-                navController)
-            isWebOpen = true
-        }
     }
-
-
-
-}
-
-    }
-
 }
 
 @Composable
-fun BookItem(
-    name: File,
-    booksViewModel: BooksViewModel,
+fun EmptyLibraryView() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        // Using a built-in Icon with a soft background for a premium feel
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Rounded.LibraryBooks,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp),
+                tint = MaterialTheme.colorScheme.primary
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(
+            text = "try adding books using + icon",
+            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "add books",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            lineHeight = 20.sp
+        )
+    }
+}
+
+
+
+@Composable
+fun BookListItem(
+    file: File,
+    viewModel: BooksViewModel,
     navController: NavController
 ) {
-
     val context = LocalContext.current
     val dismissState = rememberSwipeToDismissBoxState(
         confirmValueChange = {
-            when(it) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                         booksViewModel.removePdfFromAppDirectory(context, name.canonicalFile.toUri())
-                        }
-                 else -> Unit
+            if (it == SwipeToDismissBoxValue.StartToEnd) {
+                viewModel.removePdfFromAppDirectory(context, file.canonicalFile.toUri())
             }
-            return@rememberSwipeToDismissBoxState true
-        },
-        // positional threshold of 25%
-        positionalThreshold = { it * .25f }
+            true
+        }
     )
 
     SwipeToDismissBox(
         state = dismissState,
-        modifier = Modifier,
-enableDismissFromStartToEnd = true,
+        enableDismissFromStartToEnd = true,
         enableDismissFromEndToStart = false,
-        backgroundContent = {DismissBackground(dismissState)},
+        backgroundContent = { DismissBackground(dismissState) }
     ) {
-
-    Card(onClick = {
-navController.navigate("bookOpen/${Uri.encode(name.toUri().toString())}")
-
-                   }, modifier = Modifier
-        .fillMaxWidth()
-        .padding(5.dp),
-        elevation = CardDefaults.elevatedCardElevation(10.dp),
-        shape = RoundedCornerShape(20)
-        ) {
-
-        Row(modifier = Modifier.fillMaxWidth()){
-
-        Image(painter = painterResource(R.drawable._282), contentDescription = null,
-            modifier = Modifier.weight(1f))
-        Text(text = name.name, fontSize = 20.sp,
+        Card(
+            onClick = {
+                navController.navigate("bookOpen/${Uri.encode(file.toUri().toString())}")
+            },
             modifier = Modifier
-                .padding(10.dp)
-                .weight(3f),
-            textAlign = TextAlign.Start,
-            maxLines = 2)
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 6.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // ICON INDICATOR
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.PictureAsPdf,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
 
-    }
-    }
-    }
+                Column(modifier = Modifier.padding(start = 16.dp).weight(1f)) {
+                    Text(
+                        text = file.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = "${(file.length() / 1024 / 1024)} MB • PDF Document",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
 
+                Icon(
+                    imageVector = Icons.Default.ChevronRight,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline
+                )
+            }
+        }
+    }
 }
 
 @Composable

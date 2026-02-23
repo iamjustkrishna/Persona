@@ -104,7 +104,7 @@ fun VoiceMemosScreen() {
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background
     ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+        Box(modifier = Modifier.fillMaxSize()) {
 
             Column(modifier = Modifier.fillMaxSize()) {
                 // 1. BRANDED HEADER

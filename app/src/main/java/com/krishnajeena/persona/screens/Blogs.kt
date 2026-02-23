@@ -143,107 +143,11 @@ fun StudyScreen(
             when (page) {
                 0 -> VaultSection(blogUrlViewModel, navController)
                 1 -> NotesScreen()
-                2 -> BooksScreen()
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun MyBlogsSection(
-    setShowBottomSheet: (Boolean) -> Unit,
-    isWebOpen: Boolean,
-    navController: NavHostController,
-    context: Context
-) {
-    var showBottomSheet by remember { mutableStateOf(false) }
-    Scaffold(  floatingActionButton = {
-        if (!isWebOpen) {
-            FloatingActionButton(
-                onClick = { showBottomSheet = true },
-                elevation = FloatingActionButtonDefaults.elevation(0.dp),
-                modifier = Modifier.padding(bottom = 80.dp)
-            ) {
-                Icon(imageVector = Icons.Default.Add, contentDescription = null)
-            }
-        }
-    },
-        floatingActionButtonPosition = FabPosition.Center) { innerPadding ->
-
-    val blogUrlViewModel = hiltViewModel<BlogUrlViewModel>()
-
-    if (showBottomSheet) {
-        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-        val scope = rememberCoroutineScope()
-
-        ModalBottomSheet(
-            sheetState = sheetState,
-            onDismissRequest = { setShowBottomSheet(false) }
-        ) {
-            var blogName by remember { mutableStateOf("") }
-            var blogUrl by remember { mutableStateOf("") }
-
-            Column(
-                modifier = Modifier
-                    .padding(5.dp)
-                    .fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                OutlinedTextField(
-                    value = blogName,
-                    onValueChange = { blogName = it },
-                    label = { Text("Blog Name") }
-                )
-                Spacer(modifier = Modifier.height(10.dp))
-                OutlinedTextField(
-                    value = blogUrl,
-                    onValueChange = { blogUrl = it },
-                    label = { Text("Blog Url") }
-                )
-                Spacer(modifier = Modifier.height(15.dp))
-
-                OutlinedButton(
-                    onClick = {
-                        if (blogName.isNotBlank() && blogUrl.isNotBlank()) {
-                            val formattedUrl = formatUrl(blogUrl)
-                            if (formattedUrl != null) {
-                                try {
-                                    blogUrlViewModel.addUrl(blogName, formattedUrl)
-                                    Toast.makeText(context, "Blog is added!", Toast.LENGTH_SHORT).show()
-                                } catch (_: Exception) {
-                                    Toast.makeText(context, "Something went wrong!", Toast.LENGTH_SHORT).show()
-                                }
-                            } else Toast.makeText(context, "Wrong Url!", Toast.LENGTH_SHORT).show()
-
-                            scope.launch { sheetState.hide() }.invokeOnCompletion {
-                                if (!sheetState.isVisible) setShowBottomSheet(false)
-                            }
-                        } else {
-                            Toast.makeText(context, "Fields can't be empty!", Toast.LENGTH_SHORT).show()
-                        }
-                    },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                ) {
-                    Text("Add Blog", fontFamily = FontFamily.SansSerif, fontSize = 15.sp)
-                }
-            }
-        }
-    }
-
-    if (blogUrlViewModel.isEmpty()) {
-        Image(painter = painterResource(R.drawable.undraw_blog_post_re_fy5x), contentDescription = null)
-    } else {
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            items(blogUrlViewModel.urls) { item ->
-                BlogsItem(
-                    item = item,
-                    blogUrlViewModel = blogUrlViewModel,
+                2 -> BooksScreen(
                     navController = navController
                 )
             }
         }
-    }
     }
 }
 
@@ -269,52 +173,6 @@ fun formatUrl(url: String): String? {
     } else {
         null // Empty URL
     }
-}
-
-@Composable
-fun BlogsItem(
-    blogUrlViewModel: BlogUrlViewModel,
-    item: BlogUrl,
-    navController: NavController
-) {
-
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = {
-            when(it) {
-                SwipeToDismissBoxValue.StartToEnd -> {
-                    blogUrlViewModel.removeUrl(item)
-                }
-                else -> Unit
-            }
-            return@rememberSwipeToDismissBoxState true
-        },
-        // positional threshold of 25%
-        positionalThreshold = { it * .25f }
-    )
-SwipeToDismissBox(
-    state = dismissState,
-    enableDismissFromStartToEnd = true,
-    enableDismissFromEndToStart = false,
-    modifier = Modifier,
-    backgroundContent = { DismissBackground(dismissState) }
-) {
-    Card(modifier = Modifier.padding(5.dp),
-        onClick = {
-
-            navController.navigate("webView/${Uri.encode(item.url)}")
-
-                  },
-        elevation = CardDefaults.elevatedCardElevation(10.dp),
-        shape = RoundedCornerShape(10.dp)
-    )   {
-        Column(modifier = Modifier.fillMaxWidth().padding(5.dp)
-            , horizontalAlignment = Alignment.CenterHorizontally){
-            Text(text = item.name, fontSize = 20.sp)
-            Spacer(modifier = Modifier.height(5.dp))
-            Text(text = item.url, fontSize = 12.sp)
-        }
-    }
-}
 }
 
 @RequiresApi(Build.VERSION_CODES.R)

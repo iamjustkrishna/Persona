@@ -4,6 +4,7 @@ import android.content.Context
 import com.krishnajeena.persona.data_layer.DailyQuote
 import com.krishnajeena.persona.network.RetrofitClientQuote
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.withTimeout
 import java.time.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,14 +20,21 @@ class QuoteRepository @Inject constructor(
         val today = LocalDate.now().toString()
         val saved = getSavedQuote()
 
-        return if (saved?.date == today) {
+        if (saved?.date == today) {
             saved
-        } else {
+        }
+
+        return try {
+
+            withTimeout(5000L){
             val response = RetrofitClientQuote.getInstance().getQuoteOfTheDay()
             val newQuote = response.body()?.quote ?: "No quote available"
             val dailyQuote = DailyQuote(newQuote, today)
             saveQuote(dailyQuote)
             dailyQuote
+            }
+        } catch(e: Exception){
+            saved ?: DailyQuote("Stay focused, stay driven.", today)
         }
     }
 

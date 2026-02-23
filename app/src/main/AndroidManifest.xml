@@ -24,6 +24,8 @@
 
     <application
         android:name=".BaseClass"
+        android:enableOnBackInvokedCallback="true"
+        android:hardwareAccelerated="true"
         android:allowBackup="true"
         android:requestLegacyExternalStorage="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -41,6 +43,14 @@
             android:name=".services.PlaybackService"
             android:enabled="true"
             android:exported="true" >
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+        <service
+            android:name=".services.RadioService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="false">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>

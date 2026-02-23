@@ -1,6 +1,9 @@
 package com.krishnajeena.persona.network
 
 
+import androidx.annotation.OptIn
+import androidx.media3.common.util.Log
+import androidx.media3.common.util.UnstableApi
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -21,6 +24,7 @@ interface QuoteApi {
     suspend fun getQuoteOfTheDay(): Response<QuoteResponse>
 }
 
+@OptIn(UnstableApi::class)
 suspend fun fetchRemoteBaseUrl(): String? = withContext(Dispatchers.IO) {
     try {
         val url = URL("https://raw.githubusercontent.com/iamjustkrishna/KrishnaJeena/refs/heads/main/config_persona.json")
@@ -31,7 +35,7 @@ suspend fun fetchRemoteBaseUrl(): String? = withContext(Dispatchers.IO) {
         val config = JSONObject(json)
         config.getString("base_url")
     } catch (e: Exception) {
-        e.printStackTrace()
+        Log.e("PERSONA_DEBUG", "Quote Metadata Fetch Failed: ${e.message}")
         null
     }
 }

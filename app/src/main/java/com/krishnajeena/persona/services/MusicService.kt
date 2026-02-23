@@ -21,6 +21,7 @@ class MusicService : MediaSessionService() {
 
         mediaSession = MediaSession.Builder(this, player)
             .setCallback(MediaSessionCallback())
+            .setId("Persona_Music_Service")
             .build()
 }
 
@@ -29,6 +30,7 @@ class MusicService : MediaSessionService() {
 
     override fun onDestroy() {
         mediaSession?.run {
+            player.stop()
             player.release()
             release()
             mediaSession = null
