@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -100,92 +101,107 @@ fun VoiceMemosScreen() {
         recordings = audioRecorder.getRecordings()
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        Column(modifier = Modifier.fillMaxSize()) {
+//            // 1. HEADER WITH BETTER SPACING
+//            Column(
+//                modifier = Modifier
+//                    .fillMaxWidth()
+//                    .padding(horizontal = 20.dp, vertical = 12.dp)
+//            ) {
+//                Text(
+//                    text = "Hold the mic to record",
+//                    style = MaterialTheme.typography.bodyMedium,
+//                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+//                    modifier = Modifier.padding(top = 4.dp)
+//                )
+//            }
 
-            Column(modifier = Modifier.fillMaxSize()) {
-                // 1. BRANDED HEADER
-                Text(
-                    text = "Voice Memos",
-                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Black),
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)
-                )
+            // 2. RECORDINGS LIST
+            RecordingsList(
+                recordings = recordings,
+                modifier = Modifier.weight(1f)
+            ) { deletedFile ->
+                recordings = recordings.filter { it != deletedFile }
+            }
+        }
 
-                // 2. RECORDINGS LIST (Logic preserved)
-                RecordingsList(
-                    recordings = recordings,
-                    modifier = Modifier.weight(1f)
-                ) { deletedFile ->
-                    recordings = recordings.filter { it != deletedFile }
+        // 3. RECORDING BUTTON
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 140.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Status indicator
+            AnimatedVisibility(visible = isRecording) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .background(
+                            MaterialTheme.colorScheme.errorContainer,
+                            RoundedCornerShape(12.dp)
+                        )
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(MaterialTheme.colorScheme.error, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Recording...",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
                 }
             }
 
-            // 3. THE "STUDIO" RECORDING BUTTON
-            Column(
+            Spacer(modifier = Modifier.height(16.dp))
+
+            FloatingActionButton(
+                onClick = { showTooltip = true },
                 modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 160.dp), // Matches your navigation clearance
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Tooltip logic preserved but visually improved
-                AnimatedVisibility(visible = showTooltip || isRecording) {
-                    Text(
-                        text = if (isRecording) "Recording..." else "Hold to record",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (isRecording) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                FloatingActionButton(
-                    onClick = { showTooltip = true },
-                    modifier = Modifier
-                        .size(72.dp)
-                        .scale(pulseScale)
-                        .pointerInput(Unit) {
-                            awaitPointerEventScope {
-                                while (true) {
-                                    val event = awaitPointerEvent()
-                                    when (event.type) {
-                                        PointerEventType.Press -> {
-                                            if (permissionToRecordAudio) {
-                                                isRecording = true
-                                                audioRecorder.startRecording()
-                                            }
+                    .size(80.dp)
+                    .scale(pulseScale)
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                when (event.type) {
+                                    PointerEventType.Press -> {
+                                        if (permissionToRecordAudio) {
+                                            isRecording = true
+                                            audioRecorder.startRecording()
                                         }
-                                        PointerEventType.Release -> {
-                                            if (isRecording) {
-                                                isRecording = false
-                                                try {
-                                                    audioRecorder.stopRecording()
-                                                    showSaveDialog = true
-                                                } catch (e: RuntimeException) {
-                                                    Log.e("AudioRecorder", "Stop Error", e)
-                                                }
+                                    }
+                                    PointerEventType.Release -> {
+                                        if (isRecording) {
+                                            isRecording = false
+                                            try {
+                                                audioRecorder.stopRecording()
+                                                showSaveDialog = true
+                                            } catch (e: RuntimeException) {
+                                                Log.e("AudioRecorder", "Stop Error", e)
                                             }
                                         }
                                     }
                                 }
                             }
-                        },
-                    containerColor = fabColor,
-                    contentColor = Color.White,
-                    shape = CircleShape,
-                    elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                        contentDescription = null,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
+                        }
+                    },
+                containerColor = fabColor,
+                contentColor = Color.White,
+                shape = CircleShape,
+                elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 12.dp)
+            ) {
+                Icon(
+                    imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
+                    contentDescription = if (isRecording) "Stop Recording" else "Hold to Record",
+                    modifier = Modifier.size(36.dp)
+                )
             }
         }
     }
@@ -223,7 +239,8 @@ fun RecordingsList(recordings: List<AudioFile>, modifier: Modifier = Modifier, o
         Column(modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally){
 //     AsyncImage(model = R.drawable._264828, contentDescription = "No Voice Memos!",)
-            Text("No recorded memos! Hold mic to record one.", fontSize = 18.sp)
+            Text("No recorded memos! Hold mic to record one.", fontSize = 18.sp,
+                modifier = Modifier.align(Alignment.CenterHorizontally), textAlign = TextAlign.Center)
         }
     }
     else {

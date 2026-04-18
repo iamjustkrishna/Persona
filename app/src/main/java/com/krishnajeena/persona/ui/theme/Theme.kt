@@ -17,7 +17,156 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.krishnajeena.persona.data_layer.AppTheme
 
+// Warm Sunset Schemes
+private val warmSunsetLightScheme = lightColorScheme(
+    primary = WarmSunsetLight.primary,
+    onPrimary = WarmSunsetLight.onPrimary,
+    primaryContainer = WarmSunsetLight.primaryContainer,
+    onPrimaryContainer = WarmSunsetLight.onPrimaryContainer,
+    secondary = WarmSunsetLight.secondary,
+    onSecondary = WarmSunsetLight.onSecondary,
+    secondaryContainer = WarmSunsetLight.secondaryContainer,
+    onSecondaryContainer = WarmSunsetLight.onSecondaryContainer,
+    tertiary = WarmSunsetLight.tertiary,
+    onTertiary = WarmSunsetLight.onTertiary,
+    tertiaryContainer = WarmSunsetLight.tertiaryContainer,
+    onTertiaryContainer = WarmSunsetLight.onTertiaryContainer,
+    background = WarmSunsetLight.background,
+    onBackground = WarmSunsetLight.onBackground,
+    surface = WarmSunsetLight.surface,
+    onSurface = WarmSunsetLight.onSurface,
+    surfaceVariant = WarmSunsetLight.surfaceVariant,
+    onSurfaceVariant = WarmSunsetLight.onSurfaceVariant,
+    outline = WarmSunsetLight.outline,
+    outlineVariant = WarmSunsetLight.outlineVariant,
+    error = WarmSunsetLight.error
+)
+
+private val warmSunsetDarkScheme = darkColorScheme(
+    primary = WarmSunsetDark.primary,
+    onPrimary = WarmSunsetDark.onPrimary,
+    primaryContainer = WarmSunsetDark.primaryContainer,
+    onPrimaryContainer = WarmSunsetDark.onPrimaryContainer,
+    secondary = WarmSunsetDark.secondary,
+    onSecondary = WarmSunsetDark.onSecondary,
+    secondaryContainer = WarmSunsetDark.secondaryContainer,
+    onSecondaryContainer = WarmSunsetDark.onSecondaryContainer,
+    tertiary = WarmSunsetDark.tertiary,
+    onTertiary = WarmSunsetDark.onTertiary,
+    tertiaryContainer = WarmSunsetDark.tertiaryContainer,
+    onTertiaryContainer = WarmSunsetDark.onTertiaryContainer,
+    background = WarmSunsetDark.background,
+    onBackground = WarmSunsetDark.onBackground,
+    surface = WarmSunsetDark.surface,
+    onSurface = WarmSunsetDark.onSurface,
+    surfaceVariant = WarmSunsetDark.surfaceVariant,
+    onSurfaceVariant = WarmSunsetDark.onSurfaceVariant,
+    outline = WarmSunsetDark.outline,
+    outlineVariant = WarmSunsetDark.outlineVariant,
+    error = WarmSunsetDark.error
+)
+
+// Midnight Purple Schemes
+private val midnightPurpleLightScheme = lightColorScheme(
+    primary = MidnightPurpleLight.primary,
+    onPrimary = MidnightPurpleLight.onPrimary,
+    primaryContainer = MidnightPurpleLight.primaryContainer,
+    onPrimaryContainer = MidnightPurpleLight.onPrimaryContainer,
+    secondary = MidnightPurpleLight.secondary,
+    onSecondary = MidnightPurpleLight.onSecondary,
+    secondaryContainer = MidnightPurpleLight.secondaryContainer,
+    onSecondaryContainer = MidnightPurpleLight.onSecondaryContainer,
+    tertiary = MidnightPurpleLight.tertiary,
+    onTertiary = MidnightPurpleLight.onTertiary,
+    tertiaryContainer = MidnightPurpleLight.tertiaryContainer,
+    onTertiaryContainer = MidnightPurpleLight.onTertiaryContainer,
+    background = MidnightPurpleLight.background,
+    onBackground = MidnightPurpleLight.onBackground,
+    surface = MidnightPurpleLight.surface,
+    onSurface = MidnightPurpleLight.onSurface,
+    surfaceVariant = MidnightPurpleLight.surfaceVariant,
+    onSurfaceVariant = MidnightPurpleLight.onSurfaceVariant,
+    outline = MidnightPurpleLight.outline,
+    outlineVariant = MidnightPurpleLight.outlineVariant,
+    error = MidnightPurpleLight.error
+)
+
+private val midnightPurpleDarkScheme = darkColorScheme(
+    primary = MidnightPurpleDark.primary,
+    onPrimary = MidnightPurpleDark.onPrimary,
+    primaryContainer = MidnightPurpleDark.primaryContainer,
+    onPrimaryContainer = MidnightPurpleDark.onPrimaryContainer,
+    secondary = MidnightPurpleDark.secondary,
+    onSecondary = MidnightPurpleDark.onSecondary,
+    secondaryContainer = MidnightPurpleDark.secondaryContainer,
+    onSecondaryContainer = MidnightPurpleDark.onSecondaryContainer,
+    tertiary = MidnightPurpleDark.tertiary,
+    onTertiary = MidnightPurpleDark.onTertiary,
+    tertiaryContainer = MidnightPurpleDark.tertiaryContainer,
+    onTertiaryContainer = MidnightPurpleDark.onTertiaryContainer,
+    background = MidnightPurpleDark.background,
+    onBackground = MidnightPurpleDark.onBackground,
+    surface = MidnightPurpleDark.surface,
+    onSurface = MidnightPurpleDark.onSurface,
+    surfaceVariant = MidnightPurpleDark.surfaceVariant,
+    onSurfaceVariant = MidnightPurpleDark.onSurfaceVariant,
+    outline = MidnightPurpleDark.outline,
+    outlineVariant = MidnightPurpleDark.outlineVariant,
+    error = MidnightPurpleDark.error
+)
+
+// Ocean Teal Schemes
+private val oceanTealLightScheme = lightColorScheme(
+    primary = OceanTealLight.primary,
+    onPrimary = OceanTealLight.onPrimary,
+    primaryContainer = OceanTealLight.primaryContainer,
+    onPrimaryContainer = OceanTealLight.onPrimaryContainer,
+    secondary = OceanTealLight.secondary,
+    onSecondary = OceanTealLight.onSecondary,
+    secondaryContainer = OceanTealLight.secondaryContainer,
+    onSecondaryContainer = OceanTealLight.onSecondaryContainer,
+    tertiary = OceanTealLight.tertiary,
+    onTertiary = OceanTealLight.onTertiary,
+    tertiaryContainer = OceanTealLight.tertiaryContainer,
+    onTertiaryContainer = OceanTealLight.onTertiaryContainer,
+    background = OceanTealLight.background,
+    onBackground = OceanTealLight.onBackground,
+    surface = OceanTealLight.surface,
+    onSurface = OceanTealLight.onSurface,
+    surfaceVariant = OceanTealLight.surfaceVariant,
+    onSurfaceVariant = OceanTealLight.onSurfaceVariant,
+    outline = OceanTealLight.outline,
+    outlineVariant = OceanTealLight.outlineVariant,
+    error = OceanTealLight.error
+)
+
+private val oceanTealDarkScheme = darkColorScheme(
+    primary = OceanTealDark.primary,
+    onPrimary = OceanTealDark.onPrimary,
+    primaryContainer = OceanTealDark.primaryContainer,
+    onPrimaryContainer = OceanTealDark.onPrimaryContainer,
+    secondary = OceanTealDark.secondary,
+    onSecondary = OceanTealDark.onSecondary,
+    secondaryContainer = OceanTealDark.secondaryContainer,
+    onSecondaryContainer = OceanTealDark.onSecondaryContainer,
+    tertiary = OceanTealDark.tertiary,
+    onTertiary = OceanTealDark.onTertiary,
+    tertiaryContainer = OceanTealDark.tertiaryContainer,
+    onTertiaryContainer = OceanTealDark.onTertiaryContainer,
+    background = OceanTealDark.background,
+    onBackground = OceanTealDark.onBackground,
+    surface = OceanTealDark.surface,
+    onSurface = OceanTealDark.onSurface,
+    surfaceVariant = OceanTealDark.surfaceVariant,
+    onSurfaceVariant = OceanTealDark.onSurfaceVariant,
+    outline = OceanTealDark.outline,
+    outlineVariant = OceanTealDark.outlineVariant,
+    error = OceanTealDark.error
+)
+
+// Legacy schemes (for backwards compatibility)
 private val lightScheme = lightColorScheme(
     primary = PrimaryIndigo,
     onPrimary = Color.White,
@@ -219,22 +368,28 @@ val unspecified_scheme = ColorFamily(
 @Composable
 fun PersonaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
+    appTheme: AppTheme = AppTheme.WARM_SUNSET,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) darkScheme else lightScheme
+    val colorScheme = when (appTheme) {
+        AppTheme.WARM_SUNSET -> if (darkTheme) warmSunsetDarkScheme else warmSunsetLightScheme
+        AppTheme.MIDNIGHT_PURPLE -> if (darkTheme) midnightPurpleDarkScheme else midnightPurpleLightScheme
+        AppTheme.OCEAN_TEAL -> if (darkTheme) oceanTealDarkScheme else oceanTealLightScheme
+    }
+
     val view = LocalView.current
 
-    // Only run this if we are NOT in the Layout Preview
     if (!view.isInEditMode) {
         SideEffect {
-            val window = (view.context as? Activity)?.window // Safe cast to nullable Activity
-            if (window != null) {
-                // 1. Set the background color
-                window.statusBarColor = colorScheme.background.toArgb()
-                window.navigationBarColor = colorScheme.background.toArgb()
+            val window = (view.context as? Activity)?.window
+            window?.let {
+                // This is the CRITICAL line for edge-to-edge
+                WindowCompat.setDecorFitsSystemWindows(it, false)
 
-                // 2. Control icon appearance
-                val controller = WindowCompat.getInsetsController(window, view)
+                it.statusBarColor = Color.Transparent.toArgb()
+                it.navigationBarColor = Color.Transparent.toArgb()
+
+                val controller = WindowCompat.getInsetsController(it, view)
                 controller.isAppearanceLightStatusBars = !darkTheme
                 controller.isAppearanceLightNavigationBars = !darkTheme
             }

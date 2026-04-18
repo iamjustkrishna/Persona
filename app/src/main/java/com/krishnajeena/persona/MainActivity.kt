@@ -1,56 +1,136 @@
 package com.krishnajeena.persona
 
-import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.AlarmManager
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.annotation.RequiresApi
-import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.ExistingWorkPolicy
-import androidx.work.OneTimeWorkRequestBuilder
-import androidx.work.PeriodicWorkRequestBuilder
-import androidx.work.WorkManager
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.krishnajeena.persona.auth.GoogleAuthUiClient
+import com.krishnajeena.persona.model.AuthViewModel
 import com.krishnajeena.persona.model.SharedViewModel
+import com.krishnajeena.persona.model.ThemeViewModel
 import com.krishnajeena.persona.other.DailyQuoteReceiver
-import com.krishnajeena.persona.other.NotificationHandler
 import com.krishnajeena.persona.reelstack.VideoDatabase
 import com.krishnajeena.persona.services.MusicService
+import com.krishnajeena.persona.ui.theme.PersonaTheme
 import com.krishnajeena.persona.ui_layer.PersonaApp
 import dagger.hilt.android.AndroidEntryPoint
-import java.time.Duration
-import java.time.LocalDateTime
+import kotlinx.coroutines.launch
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     val sharedViewModel: SharedViewModel by viewModels()
+    private val authViewModel: AuthViewModel by viewModels()
+    private val themeViewModel: ThemeViewModel by viewModels()
+
     @Inject
     lateinit var database: VideoDatabase
+
+    @Inject
+    lateinit var googleAuthUiClient: GoogleAuthUiClient
 
     @RequiresApi(Build.VERSION_CODES.R)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         lifecycle.addObserver(AppLifecycleObserver(this))
 
         setContent {
-            PersonaApp()
+            val scope = rememberCoroutineScope()
+            val authState by authViewModel.state.collectAsStateWithLifecycle()
+            val themeState by themeViewModel.themeState.collectAsStateWithLifecycle()
+            val systemDarkMode = isSystemInDarkTheme()
+
+            // Update system dark mode when it changes
+            LaunchedEffect(systemDarkMode) {
+                if (themeState.useSystemTheme) {
+                    themeViewModel.updateSystemDarkMode(systemDarkMode)
+                }
+            }
+
+            val launcher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.StartIntentSenderForResult(),
+                onResult = { result ->
+                    if (result.resultCode == Activity.RESULT_OK) {
+                        scope.launch {
+                            val signInResult = googleAuthUiClient.signInWithIntent(
+                                intent = result.data ?: return@launch
+                            )
+                            authViewModel.onSignInResult(signInResult)
+                        }
+                    } else {
+                        // User cancelled sign-in
+                        Toast.makeText(
+                            applicationContext,
+                            "Sign-in cancelled",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            )
+
+            LaunchedEffect(key1 = Unit) {
+                if (authState.isSignInSuccessful) {
+                    Toast.makeText(
+                        applicationContext,
+                        "Welcome back, ${authState.signInUser?.username ?: "User"}!",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+
+            PersonaTheme(
+                darkTheme = themeState.isDarkMode,
+                appTheme = themeState.currentTheme
+            ) {
+                PersonaApp(
+                    onSignInClick = {
+                        scope.launch {
+                            try {
+                                val signInIntentSender = googleAuthUiClient.signIn()
+                                if (signInIntentSender != null) {
+                                    val request = IntentSenderRequest.Builder(signInIntentSender).build()
+                                    launcher.launch(request)
+                                } else {
+                                    Toast.makeText(
+                                        applicationContext,
+                                        "Sign-in not available. Please check your configuration.",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(
+                                    applicationContext,
+                                    "Sign-in error: ${e.message}",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                )
+            }
             scheduleDailyAlarm(applicationContext)
         }
     }

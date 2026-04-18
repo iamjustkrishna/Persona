@@ -1,12 +1,23 @@
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
+        android:shortcutId="voice_memos"
+        android:enabled="true"
+        android:icon="@drawable/mic"
+        android:shortcutShortLabel="@string/voice_memo_short"
+        android:shortcutLongLabel="@string/voice_memo_long">
+        <intent
+            android:action="android.intent.action.MAIN"
+            android:targetPackage="com.krishnajeena.persona"
+            android:targetClass="com.krishnajeena.persona.MainActivity"
+            android:data="app://com.krishnajeena.persona/voice_memos" />
+    </shortcut>
+
+    <shortcut
         android:shortcutId="camera"
         android:enabled="true"
         android:icon="@drawable/imagesmode_24px"
         android:shortcutShortLabel="@string/shortcutShort"
         android:shortcutLongLabel="@string/shortcutLong">
-
-        <!-- Intent must use android:action -->
         <intent
             android:action="android.intent.action.MAIN"
             android:targetPackage="com.krishnajeena.persona"

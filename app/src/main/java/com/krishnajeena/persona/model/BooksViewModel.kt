@@ -6,10 +6,15 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.widget.Toast
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.krishnajeena.persona.network.GutendexBook
+import com.krishnajeena.persona.network.RetrofitInstanceGutendex
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -21,9 +26,63 @@ class BooksViewModel(context: Context) : ViewModel() {
     private val _pdfList = MutableLiveData<List<File>>(emptyList())
     val pdfList : LiveData<List<File>> get() = _pdfList
 
+    // Online books state
+    var onlineBooks by mutableStateOf<List<GutendexBook>>(emptyList())
+        private set
+
+    var isLoadingOnlineBooks by mutableStateOf(false)
+        private set
+
+    var onlineBooksError by mutableStateOf<String?>(null)
+        private set
+
+    var searchQuery by mutableStateOf("")
+        private set
+
     init{
         viewModelScope.launch {
             _pdfList.value = loadBooks(context)
+            fetchPopularBooks()
+        }
+    }
+
+    fun updateSearchQuery(query: String) {
+        searchQuery = query
+        if (query.length >= 2) {
+            searchOnlineBooks(query)
+        } else if (query.isEmpty()) {
+            fetchPopularBooks()
+        }
+    }
+
+    fun fetchPopularBooks() {
+        viewModelScope.launch {
+            isLoadingOnlineBooks = true
+            onlineBooksError = null
+            try {
+                val response = RetrofitInstanceGutendex.api.getPopularBooks()
+                onlineBooks = response.results
+            } catch (e: Exception) {
+                onlineBooksError = "Failed to load books"
+                onlineBooks = emptyList()
+            } finally {
+                isLoadingOnlineBooks = false
+            }
+        }
+    }
+
+    private fun searchOnlineBooks(query: String) {
+        viewModelScope.launch {
+            isLoadingOnlineBooks = true
+            onlineBooksError = null
+            try {
+                val response = RetrofitInstanceGutendex.api.getBooks(search = query)
+                onlineBooks = response.results
+            } catch (e: Exception) {
+                onlineBooksError = "Search failed"
+            } finally {
+                isLoadingOnlineBooks = false
+            }
         }
     }
     fun savePdfToAppDirectory(context: Context, pdfUri: Uri) {

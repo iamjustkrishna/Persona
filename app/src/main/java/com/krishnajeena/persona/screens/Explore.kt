@@ -93,6 +93,7 @@ import com.krishnajeena.persona.R
 import com.krishnajeena.persona.data_layer.ArticleEntity
 import com.krishnajeena.persona.data_layer.BlogCategory
 import com.krishnajeena.persona.data_layer.BlogItem
+import com.krishnajeena.persona.model.AuthViewModel
 import com.krishnajeena.persona.model.BlogUrlViewModel
 import com.krishnajeena.persona.model.ExploreViewModel
 
@@ -195,9 +196,12 @@ fun ExploreScreen(
     navController: NavHostController,
     onCategoryClick: (List<BlogItem>, String) -> Unit,
     viewModel: ExploreViewModel = hiltViewModel(),
-    blogUrlViewModel: BlogUrlViewModel = hiltViewModel() // Use your existing ViewModel
+    blogUrlViewModel: BlogUrlViewModel = hiltViewModel(), // Use your existing ViewModel
+    authViewModel: AuthViewModel = hiltViewModel() // Add AuthViewModel
 ) {
+    val context = LocalContext.current
     val isConnected by viewModel.isConnected.collectAsState()
+    val authState by authViewModel.state.collectAsState()
     val isLoading = viewModel.isLoading
     val selectedTag = viewModel.selectedCategory
     val feed = viewModel.combinedFeed
@@ -264,11 +268,21 @@ fun ExploreScreen(
                         }
 
                         val onSummarize = {
-                            // Capture metadata before opening the sheet
-                            activeTitle = article.title
-                            activeUrl = article.url
-                            showSummarySheet = true
-                            viewModel.summarizeArticle(article.url)
+                            // Check if user is logged in
+                            if (authState.isSignInSuccessful && authState.signInUser != null) {
+                                // Capture metadata before opening the sheet
+                                activeTitle = article.title
+                                activeUrl = article.url
+                                showSummarySheet = true
+                                viewModel.summarizeArticle(article.url)
+                            } else {
+                                // Show toast if not logged in
+                                Toast.makeText(
+                                    context,
+                                    "Login to use summarization feature",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
                         }
 
                         if (article.source == "founder") {

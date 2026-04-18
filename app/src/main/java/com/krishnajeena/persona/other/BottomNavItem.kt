@@ -8,14 +8,19 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.rounded.Timer
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class BottomNavItem(val route: String, val icon: ImageVector, val label: String) {
     object Explore : BottomNavItem("explore", Icons.Default.Explore, "Explore")
-    object ReelStack : BottomNavItem("reelstack", Icons.Default.Movie, "Reels")
+    object Focus : BottomNavItem("focus", Icons.Rounded.Timer, "Focus")
     object Clicks : BottomNavItem("clicks", Icons.Default.CameraAlt, "Clicks")
     object Study : BottomNavItem("study", Icons.AutoMirrored.Filled.MenuBook, "Study")
     object Tools : BottomNavItem("tools", Icons.Default.Build, "Tools")
     object BlogsOfCategory : BottomNavItem("blogsofcategory", Icons.Default.MenuBook, "Blogs")
     object Music : BottomNavItem("music", Icons.Default.MusicNote, "Music")
+
+    // Deprecated - kept for backwards compatibility
+    @Deprecated("Use Focus instead", ReplaceWith("Focus"))
+    object ReelStack : BottomNavItem("reelstack", Icons.Default.Movie, "Reels")
 }

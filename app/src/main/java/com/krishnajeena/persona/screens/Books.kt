@@ -1,9 +1,12 @@
 package com.krishnajeena.persona.screens
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.webkit.WebView
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.Image
@@ -22,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -36,7 +40,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.LibraryBooks
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.PictureAsPdf
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -53,6 +59,7 @@ import androidx.compose.material3.SwipeToDismissBoxState
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -94,10 +101,12 @@ import java.io.File
 @Composable
 fun BooksScreen(navController: NavHostController) {
     val context = LocalContext.current
-    // Ideally, provide this via Hilt, but keeping your logic intact:
     val booksViewModel = remember { BooksViewModel(context) }
-
     val bookList by booksViewModel.pdfList.observeAsState(emptyList())
+    val searchQuery = booksViewModel.searchQuery
+    val onlineBooks = booksViewModel.onlineBooks
+    val isLoadingOnlineBooks = booksViewModel.isLoadingOnlineBooks
+    var isSearchFocused by remember { mutableStateOf(false) }
 
     val pdfPickerLauncher = rememberLauncherForActivityResult(
         contract = GetCustomContents(isMultiple = true),
@@ -106,18 +115,38 @@ fun BooksScreen(navController: NavHostController) {
         }
     )
 
+    val myBooksDir = File(
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+        "Persona/MyBooks"
+    )
+
+    val downloadedBooks = remember {
+        myBooksDir.listFiles()?.filter {
+            it.extension == "pdf" || it.extension == "epub"
+        } ?: emptyList()
+    }
+
+    val allLocalBooks = bookList + downloadedBooks
+    val showingOnlineResults = searchQuery.isNotEmpty() || isSearchFocused
+
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = { pdfPickerLauncher.launch("application/pdf") },
-                modifier = Modifier.padding(bottom = 86.dp), // Clears bottom nav
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = CircleShape
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Add Book")
+            if (!showingOnlineResults) {
+                FloatingActionButton(
+                    onClick = { pdfPickerLauncher.launch("application/pdf") },
+                    modifier = Modifier.padding(bottom = 86.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = CircleShape,
+                    elevation = FloatingActionButtonDefaults.elevation(
+                        defaultElevation = 8.dp,
+                        pressedElevation = 12.dp
+                    )
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Add Book")
+                }
             }
         },
         floatingActionButtonPosition = FabPosition.Center
@@ -126,34 +155,149 @@ fun BooksScreen(navController: NavHostController) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(bottom = paddingValues.calculateBottomPadding())
-                .statusBarsPadding()
         ) {
+            // Search Bar with smooth expand/collapse
+            androidx.compose.material3.OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { booksViewModel.updateSearchQuery(it) },
+                placeholder = {
+                    Text(
+                        if (showingOnlineResults) "Search 70,000+ free books..."
+                        else "Search library or browse online..."
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        imageVector = androidx.compose.material.icons.Icons.Default.Search,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        androidx.compose.material3.IconButton(
+                            onClick = {
+                                booksViewModel.updateSearchQuery("")
+                                isSearchFocused = false
+                            }
+                        ) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.Icons.Default.Close,
+                                contentDescription = "Clear",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) { isSearchFocused = true },
+                shape = RoundedCornerShape(28.dp),
+                colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+                ),
+                singleLine = true
+            )
 
-
-            // 2. BOOKS CONTENT
-            Box(modifier = Modifier.weight(1f)) {
-                val myBooksDir = File(
-                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-                    "Persona/MyBooks"
-                )
-
-                val downloadedBooks = remember {
-                    myBooksDir.listFiles()?.filter {
-                        it.extension == "pdf" || it.extension == "epub"
-                    } ?: emptyList()
-                }
-
-                val allBooks = bookList + downloadedBooks
-
-                if (allBooks.isEmpty()) {
-                    EmptyLibraryView()
+            androidx.compose.animation.AnimatedContent(
+                targetState = showingOnlineResults,
+                label = "content_switch"
+            ) { showingOnline ->
+                if (showingOnline) {
+                    // Online Books View
+                    when {
+                        isLoadingOnlineBooks -> {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    androidx.compose.material3.CircularProgressIndicator(
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "Searching...",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                        onlineBooks.isEmpty() && searchQuery.isNotEmpty() -> {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(32.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = "📚",
+                                    style = MaterialTheme.typography.displayMedium
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "No books found",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Try a different search term",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        else -> {
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                if (searchQuery.isEmpty() && onlineBooks.isNotEmpty()) {
+                                    Text(
+                                        text = "Popular Free Books",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                LazyColumn(
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding = PaddingValues(bottom = 100.dp)
+                                ) {
+                                    items(onlineBooks) { book ->
+                                        OnlineBookItem(book, context)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp)
-                    ) {
-                        items(items = allBooks, key = { it.absolutePath }) { book ->
-                            BookListItem(book, booksViewModel, navController)
+                    // Local Books View
+                    if (allLocalBooks.isEmpty()) {
+                        EmptyLibraryView()
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(top = 8.dp, bottom = 100.dp)
+                        ) {
+                            item {
+                                Text(
+                                    text = "My Library",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            items(items = allLocalBooks, key = { it.absolutePath }) { book ->
+                                BookListItem(book, booksViewModel, navController)
+                            }
                         }
                     }
                 }
@@ -209,6 +353,101 @@ fun EmptyLibraryView() {
 
 
 @Composable
+fun OnlineBookItem(
+    book: com.krishnajeena.persona.network.GutendexBook,
+    context: Context
+) {
+    Card(
+        onClick = {
+            // Get PDF URL from formats
+            val pdfUrl = book.formats["application/pdf"]
+                ?: book.formats["application/epub+zip"]
+                ?: return@Card
+
+            // Open PDF in browser
+            try {
+                val intent = android.content.Intent(android.content.Intent.ACTION_VIEW).apply {
+                    data = Uri.parse(pdfUrl)
+                    flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            } catch (e: Exception) {
+                Toast.makeText(context, "Unable to open book", Toast.LENGTH_SHORT).show()
+            }
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Book Cover placeholder or icon
+            Box(
+                modifier = Modifier
+                    .size(60.dp, 80.dp)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer,
+                        RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PictureAsPdf,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .weight(1f)
+            ) {
+                Text(
+                    text = book.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                if (book.authors.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = book.authors.firstOrNull()?.name ?: "Unknown",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "Free • ${book.download_count} downloads",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.outline
+            )
+        }
+    }
+}
+
+@Composable
 fun BookListItem(
     file: File,
     viewModel: BooksViewModel,
@@ -238,7 +477,7 @@ fun BookListItem(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 6.dp),
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
         ) {
             Row(
                 modifier = Modifier.padding(12.dp),
@@ -287,28 +526,24 @@ fun BookListItem(
 @Composable
 fun DismissBackground(dismissState: SwipeToDismissBoxState) {
     val color = when (dismissState.dismissDirection) {
-        SwipeToDismissBoxValue.StartToEnd -> Color(0xFFFFFFFF)
+        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.errorContainer
         else  -> Color.Transparent
     }
-Card(modifier = Modifier
-    .fillMaxWidth()
-    .padding(4.dp),
-    elevation = CardDefaults.elevatedCardElevation((-10).dp)){
-    Row(
+
+    Box(
         modifier = Modifier
-            .fillMaxSize()
-            .background(color)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .background(color, RoundedCornerShape(16.dp)),
+        contentAlignment = Alignment.CenterStart
     ) {
         Icon(
-            Icons.Default.Delete,
-            contentDescription = "delete"
+            imageVector = Icons.Default.Delete,
+            contentDescription = "Delete",
+            tint = MaterialTheme.colorScheme.onErrorContainer,
+            modifier = Modifier.padding(start = 24.dp)
         )
-
     }
-}
 }
 
 @Preview(showBackground = true, showSystemUi = true)

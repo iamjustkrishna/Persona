@@ -77,4 +77,12 @@ object RadioLibrary {
         // --- INTERNATIONAL PERSPECTIVE ---
         RadioStation(10, "Bob Dylan Exclusive", "Folk/Rock", "https://streaming.exclusive.radio/er/bobdylan/icecast.audio?aw_0_req_lsid=f5e9489c2303cb5302bfe247d7e03772", "USA"),
     )
+
+    // Focus-friendly ambient music stations
+    val focusStations = listOf(
+        RadioStation(100, "Lofi Hip Hop", "Study Beats", "https://stream.zeno.fm/f3wvbbqmdg8uv", "Global"),
+        RadioStation(101, "Deep Focus", "Ambient", "https://stream.zeno.fm/0r0xa792kwzuv", "Global"),
+        RadioStation(102, "Calm Piano", "Classical", "https://stream.zeno.fm/3qp6w2wkg5zuv", "Global"),
+        RadioStation(103, "Nature Sounds", "Ambient", "https://stream.zeno.fm/wcpry168vtzuv", "Global"),
+    )
 }

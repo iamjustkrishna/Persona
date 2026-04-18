@@ -1,6 +1,186 @@
 package com.krishnajeena.persona.ui.theme
 import androidx.compose.ui.graphics.Color
 
+// ============================================
+// WARM SUNSET THEME (DEFAULT)
+// ============================================
+object WarmSunsetLight {
+    val primary = Color(0xFFFF6B6B)
+    val onPrimary = Color(0xFFFFFFFF)
+    val primaryContainer = Color(0xFFFFE5E5)
+    val onPrimaryContainer = Color(0xFF8B0000)
+
+    val secondary = Color(0xFF6A1B9A)
+    val onSecondary = Color(0xFFFFFFFF)
+    val secondaryContainer = Color(0xFFF3E5F5)
+    val onSecondaryContainer = Color(0xFF4A148C)
+
+    val tertiary = Color(0xFFFFB300)
+    val onTertiary = Color(0xFF000000)
+    val tertiaryContainer = Color(0xFFFFECB3)
+    val onTertiaryContainer = Color(0xFF7F6000)
+
+    val background = Color(0xFFFFF8F0)
+    val onBackground = Color(0xFF1A1A1A)
+    val surface = Color(0xFFFFFFFF)
+    val onSurface = Color(0xFF1A1A1A)
+    val surfaceVariant = Color(0xFFFFF0E6)
+    val onSurfaceVariant = Color(0xFF4A4A4A)
+
+    val outline = Color(0xFFE0C4B8)
+    val outlineVariant = Color(0xFFF5E6DC)
+    val error = Color(0xFFD32F2F)
+}
+
+object WarmSunsetDark {
+    val primary = Color(0xFFFF8E53)
+    val onPrimary = Color(0xFF1A1A1A)
+    val primaryContainer = Color(0xFF8B0000)
+    val onPrimaryContainer = Color(0xFFFFE5E5)
+
+    val secondary = Color(0xFFBA68C8)
+    val onSecondary = Color(0xFF1A1A1A)
+    val secondaryContainer = Color(0xFF4A148C)
+    val onSecondaryContainer = Color(0xFFF3E5F5)
+
+    val tertiary = Color(0xFFFFD54F)
+    val onTertiary = Color(0xFF1A1A1A)
+    val tertiaryContainer = Color(0xFF7F6000)
+    val onTertiaryContainer = Color(0xFFFFECB3)
+
+    val background = Color(0xFF0D0D0D)
+    val onBackground = Color(0xFFFFF8F0)
+    val surface = Color(0xFF1C1C1E)
+    val onSurface = Color(0xFFFFF8F0)
+    val surfaceVariant = Color(0xFF2C2C2E)
+    val onSurfaceVariant = Color(0xFFE0D4CC)
+
+    val outline = Color(0xFF3C3C3E)
+    val outlineVariant = Color(0xFF2C2C2E)
+    val error = Color(0xFFEF5350)
+}
+
+// ============================================
+// MIDNIGHT PURPLE THEME
+// ============================================
+object MidnightPurpleLight {
+    val primary = Color(0xFF6366F1)
+    val onPrimary = Color(0xFFFFFFFF)
+    val primaryContainer = Color(0xFFE0E7FF)
+    val onPrimaryContainer = Color(0xFF1E1B4B)
+
+    val secondary = Color(0xFF8B5CF6)
+    val onSecondary = Color(0xFFFFFFFF)
+    val secondaryContainer = Color(0xFFF5F3FF)
+    val onSecondaryContainer = Color(0xFF4C1D95)
+
+    val tertiary = Color(0xFFF59E0B)
+    val onTertiary = Color(0xFF000000)
+    val tertiaryContainer = Color(0xFFFEF3C7)
+    val onTertiaryContainer = Color(0xFF78350F)
+
+    val background = Color(0xFFF8FAFC)
+    val onBackground = Color(0xFF0F172A)
+    val surface = Color(0xFFFFFFFF)
+    val onSurface = Color(0xFF0F172A)
+    val surfaceVariant = Color(0xFFF1F5F9)
+    val onSurfaceVariant = Color(0xFF475569)
+
+    val outline = Color(0xFFCBD5E1)
+    val outlineVariant = Color(0xFFE2E8F0)
+    val error = Color(0xFFDC2626)
+}
+
+object MidnightPurpleDark {
+    val primary = Color(0xFF818CF8)
+    val onPrimary = Color(0xFF1E1B4B)
+    val primaryContainer = Color(0xFF312E81)
+    val onPrimaryContainer = Color(0xFFE0E7FF)
+
+    val secondary = Color(0xFFA78BFA)
+    val onSecondary = Color(0xFF1A1A1A)
+    val secondaryContainer = Color(0xFF4C1D95)
+    val onSecondaryContainer = Color(0xFFF5F3FF)
+
+    val tertiary = Color(0xFFFBBF24)
+    val onTertiary = Color(0xFF1A1A1A)
+    val tertiaryContainer = Color(0xFF78350F)
+    val onTertiaryContainer = Color(0xFFFEF3C7)
+
+    val background = Color(0xFF0A0E27)
+    val onBackground = Color(0xFFF8FAFC)
+    val surface = Color(0xFF1E293B)
+    val onSurface = Color(0xFFF8FAFC)
+    val surfaceVariant = Color(0xFF334155)
+    val onSurfaceVariant = Color(0xFFCBD5E1)
+
+    val outline = Color(0xFF475569)
+    val outlineVariant = Color(0xFF334155)
+    val error = Color(0xFFF87171)
+}
+
+// ============================================
+// OCEAN TEAL THEME
+// ============================================
+object OceanTealLight {
+    val primary = Color(0xFF14B8A6)
+    val onPrimary = Color(0xFFFFFFFF)
+    val primaryContainer = Color(0xFFCCFBF1)
+    val onPrimaryContainer = Color(0xFF134E4A)
+
+    val secondary = Color(0xFF06B6D4)
+    val onSecondary = Color(0xFFFFFFFF)
+    val secondaryContainer = Color(0xFFE0F2FE)
+    val onSecondaryContainer = Color(0xFF164E63)
+
+    val tertiary = Color(0xFFFB7185)
+    val onTertiary = Color(0xFFFFFFFF)
+    val tertiaryContainer = Color(0xFFFFE4E6)
+    val onTertiaryContainer = Color(0xFF881337)
+
+    val background = Color(0xFFF0FDFA)
+    val onBackground = Color(0xFF134E4A)
+    val surface = Color(0xFFFFFFFF)
+    val onSurface = Color(0xFF134E4A)
+    val surfaceVariant = Color(0xFFE6FFFA)
+    val onSurfaceVariant = Color(0xFF2C7A7B)
+
+    val outline = Color(0xFFB2F5EA)
+    val outlineVariant = Color(0xFFD1FAE5)
+    val error = Color(0xFFDC2626)
+}
+
+object OceanTealDark {
+    val primary = Color(0xFF2DD4BF)
+    val onPrimary = Color(0xFF134E4A)
+    val primaryContainer = Color(0xFF115E59)
+    val onPrimaryContainer = Color(0xFFCCFBF1)
+
+    val secondary = Color(0xFF22D3EE)
+    val onSecondary = Color(0xFF164E63)
+    val secondaryContainer = Color(0xFF0E7490)
+    val onSecondaryContainer = Color(0xFFE0F2FE)
+
+    val tertiary = Color(0xFFFDA4AF)
+    val onTertiary = Color(0xFF881337)
+    val tertiaryContainer = Color(0xFF9F1239)
+    val onTertiaryContainer = Color(0xFFFFE4E6)
+
+    val background = Color(0xFF0F1419)
+    val onBackground = Color(0xFFF0FDFA)
+    val surface = Color(0xFF1A202C)
+    val onSurface = Color(0xFFF0FDFA)
+    val surfaceVariant = Color(0xFF2D3748)
+    val onSurfaceVariant = Color(0xFFB2F5EA)
+
+    val outline = Color(0xFF4A5568)
+    val outlineVariant = Color(0xFF2D3748)
+    val error = Color(0xFFF87171)
+}
+
+// ============================================
+// LEGACY COLORS (KEEP FOR BACKWARD COMPATIBILITY)
+// ============================================
 val primaryLight = Color(0xFF415F91)
 val onPrimaryLight = Color(0xFFFFFFFF)
 val primaryContainerLight = Color(0xFFD6E3FF)
@@ -213,22 +393,15 @@ val surfaceContainerDarkHighContrast = Color(0xFF2E3036)
 val surfaceContainerHighDarkHighContrast = Color(0xFF393B41)
 val surfaceContainerHighestDarkHighContrast = Color(0xFF45474C)
 
-// Brand Accents
-val PrimaryIndigo = Color(0xFF4F46E5)    // The "Action" color
-val SecondarySlate = Color(0xFF475569)   // The "Stability" color
-val TertiaryGold = Color(0xFFD97706)     // The "Premium/Insight" color
+// Brand Accents (deprecated - use theme objects instead)
+val PrimaryIndigo = Color(0xFF4F46E5)
+val SecondarySlate = Color(0xFF475569)
+val TertiaryGold = Color(0xFFD97706)
 
-// Light Palette
 val backgroundLight = Color(0xFFF8FAFC)
 val surfaceLight = Color(0xFFFFFFFF)
 val onSurfaceLight = Color(0xFF0F172A)
 
-// Dark Palette
 val backgroundDark = Color(0xFF0F172A)
 val surfaceDark = Color(0xFF1E293B)
 val onSurfaceDark = Color(0xFFF8FAFC)
-
-
-
-
-
