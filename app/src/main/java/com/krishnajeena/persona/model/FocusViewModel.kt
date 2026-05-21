@@ -11,11 +11,16 @@ import androidx.media3.common.MediaItem
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.MoreExecutors
+import com.google.firebase.auth.FirebaseAuth
+import com.krishnajeena.persona.auth.GoogleAuthUiClient
 import com.krishnajeena.persona.data_layer.DailyFocusStats
 import com.krishnajeena.persona.data_layer.FocusComparison
+import com.krishnajeena.persona.data_layer.FocusRepository
 import com.krishnajeena.persona.data_layer.FocusSession
-import com.krishnajeena.persona.data_layer.FocusSessionDao
+import com.krishnajeena.persona.data_layer.FocusSessionStatus
 import com.krishnajeena.persona.data_layer.LeaderboardEntry
+import kotlinx.coroutines.flow.update
+import kotlin.math.ceil
 import com.krishnajeena.persona.data_layer.RadioLibrary
 import com.krishnajeena.persona.services.RadioService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,23 +36,31 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import javax.inject.Inject
-import kotlin.math.min
 
 enum class TimerState {
     IDLE, RUNNING, PAUSED, COMPLETED
 }
 
+data class TopPopupState(
+    val title: String,
+    val message: String,
+    val kind: Kind
+) {
+    enum class Kind { TOP_30, TOP_10 }
+}
+
 @HiltViewModel
 class FocusViewModel @Inject constructor(
-    private val focusSessionDao: FocusSessionDao,
+    private val repository: FocusRepository,
+    private val firebaseAuth: FirebaseAuth,
+    private val googleAuthUiClient: GoogleAuthUiClient,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    // Timer state
     var timerState by mutableStateOf(TimerState.IDLE)
         private set
 
-    var selectedDuration by mutableStateOf(25) // Default 25 minutes
+    var selectedDuration by mutableStateOf(25)
         private set
 
     var remainingSeconds by mutableStateOf(25 * 60)
@@ -57,11 +70,16 @@ class FocusViewModel @Inject constructor(
         private set
 
     private var timerJob: Job? = null
-    private var sessionStartTime: Long = 0
+    private var quoteJob: Job? = null
+    private var activeSessionId: String? = null
 
-    // Music controller
+    // Music
     private var mediaController: MediaController? = null
-    private val focusMusicUrl = RadioLibrary.focusStations.first().streamUrl // Lofi Hip Hop
+    private val focusMusicUrl = RadioLibrary.focusStations.first().streamUrl
+
+    // Sessions (for calendar/history UI)
+    private val _allSessions = MutableStateFlow<List<FocusSession>>(emptyList())
+    val allSessions: StateFlow<List<FocusSession>> = _allSessions.asStateFlow()
 
     // Stats
     private val _todayMinutes = MutableStateFlow(0)
@@ -76,13 +94,23 @@ class FocusViewModel @Inject constructor(
     private val _focusComparison = MutableStateFlow<FocusComparison?>(null)
     val focusComparison: StateFlow<FocusComparison?> = _focusComparison.asStateFlow()
 
+    private val _isLoggedIn = MutableStateFlow(false)
+    val isLoggedIn: StateFlow<Boolean> = _isLoggedIn.asStateFlow()
+
+    private val _topPopup = MutableStateFlow<TopPopupState?>(null)
+    val topPopup: StateFlow<TopPopupState?> = _topPopup.asStateFlow()
+
+    // Leaderboards
     private val _leaderboard = MutableStateFlow<List<LeaderboardEntry>>(emptyList())
     val leaderboard: StateFlow<List<LeaderboardEntry>> = _leaderboard.asStateFlow()
+
+    private val _allTimeLeaderboard = MutableStateFlow<List<LeaderboardEntry>>(emptyList())
+    val allTimeLeaderboard: StateFlow<List<LeaderboardEntry>> = _allTimeLeaderboard.asStateFlow()
 
     private val _currentStreak = MutableStateFlow(0)
     val currentStreak: StateFlow<Int> = _currentStreak.asStateFlow()
 
-    // Motivational quotes
+    // Quotes
     var currentMotivationalQuote by mutableStateOf("")
         private set
 
@@ -99,11 +127,132 @@ class FocusViewModel @Inject constructor(
         "Your dedication inspires 💎"
     )
 
-    private var quoteJob: Job? = null
+    private var activeUserId: String = "local"
+    private var activeUsername: String = "You"
+
+    private var localCollectorJob: Job? = null
+    private var cloudCollectorJob: Job? = null
+    private var dailyLeaderboardJob: Job? = null
+    private var totalLeaderboardJob: Job? = null
+
+    private var wasTop30Today: Boolean = false
+
+    private val authListener = FirebaseAuth.AuthStateListener {
+        refreshUserContext()
+    }
 
     init {
-        loadStats()
         initializeMusicController()
+        firebaseAuth.addAuthStateListener(authListener)
+        refreshUserContext()
+    }
+
+    private fun isRealLoggedIn(): Boolean {
+        val user = firebaseAuth.currentUser ?: return false
+        return !user.isAnonymous
+    }
+
+    private fun refreshUserContext() {
+        val loggedIn = isRealLoggedIn()
+        _isLoggedIn.value = loggedIn
+
+        val newUserId = if (loggedIn) firebaseAuth.currentUser!!.uid else "local"
+        val newUsername = if (loggedIn) (firebaseAuth.currentUser?.displayName ?: "You") else "You"
+
+        // If we just signed in, migrate local sessions over to this UID.
+        if (activeUserId == "local" && newUserId != "local") {
+            viewModelScope.launch {
+                repository.migrateLocalSessionsToUser(newUserId, newUsername)
+            }
+        }
+
+        activeUserId = newUserId
+        activeUsername = newUsername
+
+        restartCollectors()
+    }
+
+    private fun restartCollectors() {
+        localCollectorJob?.cancel()
+        cloudCollectorJob?.cancel()
+        dailyLeaderboardJob?.cancel()
+        totalLeaderboardJob?.cancel()
+
+        // Clear leaderboards when logged out
+        if (!_isLoggedIn.value) {
+            _leaderboard.value = emptyList()
+            _allTimeLeaderboard.value = emptyList()
+            wasTop30Today = false
+        }
+
+        // Finalize any stale IN_PROGRESS sessions for the active user.
+        // Don't do this while a timer is actively running (it would incorrectly abandon it).
+        if (timerState == TimerState.IDLE && activeSessionId == null) {
+            viewModelScope.launch {
+                repository.abandonStaleInProgressSessions(activeUserId)
+            }
+        }
+
+        // Local sessions feed (calendar/history)
+        localCollectorJob = viewModelScope.launch {
+            repository.observeLocalSessions(activeUserId).collect { sessions ->
+                _allSessions.value = sessions
+                recomputeStats(sessions)
+            }
+        }
+
+        if (!_isLoggedIn.value) return
+
+        // Cloud sessions -> cache into Room
+        cloudCollectorJob = viewModelScope.launch {
+            repository.observeCloudSessions(activeUserId).collect { cloudSessions ->
+                repository.cacheCloudSessionsToLocal(activeUserId, cloudSessions)
+            }
+        }
+        repository.scheduleSyncWork()
+
+        val today = getTodayDate()
+        dailyLeaderboardJob = viewModelScope.launch {
+            repository.observeDailyLeaderboard(today, activeUserId).collect { list ->
+                _leaderboard.value = list
+                maybeShowTopPopup(list)
+            }
+        }
+        totalLeaderboardJob = viewModelScope.launch {
+            repository.observeTotalLeaderboard(activeUserId).collect { _allTimeLeaderboard.value = it }
+        }
+    }
+
+    private fun maybeShowTopPopup(list: List<LeaderboardEntry>) {
+        val me = list.firstOrNull { it.isCurrentUser } ?: run {
+            wasTop30Today = false
+            return
+        }
+
+        val threshold = maxOf(1, ceil(list.size * 0.3).toInt())
+        val inTop30 = me.rank <= threshold
+
+        if (inTop30 && !wasTop30Today) {
+            val kind = if (me.rank <= maxOf(1, ceil(list.size * 0.1).toInt())) {
+                TopPopupState.Kind.TOP_10
+            } else {
+                TopPopupState.Kind.TOP_30
+            }
+
+            _topPopup.value = TopPopupState(
+                title = if (kind == TopPopupState.Kind.TOP_10) "Top 10%!" else "Top 30%!",
+                message = "You're on today's leaderboard (#${me.rank}). Keep it up.",
+                kind = kind
+            )
+
+            // Auto-hide
+            viewModelScope.launch {
+                delay(3500)
+                _topPopup.update { null }
+            }
+        }
+
+        wasTop30Today = inTop30
     }
 
     private fun initializeMusicController() {
@@ -129,6 +278,7 @@ class FocusViewModel @Inject constructor(
         }
     }
 
+
     fun setDuration(minutes: Int) {
         if (timerState == TimerState.IDLE) {
             selectedDuration = minutes
@@ -141,67 +291,81 @@ class FocusViewModel @Inject constructor(
     }
 
     fun startTimer() {
-        if (timerState == TimerState.IDLE || timerState == TimerState.PAUSED) {
-            timerState = TimerState.RUNNING
-            if (sessionStartTime == 0L) {
-                sessionStartTime = System.currentTimeMillis()
+        if (timerState != TimerState.IDLE && timerState != TimerState.PAUSED) return
+
+        timerState = TimerState.RUNNING
+
+        // Create an in-progress session once per run.
+        if (activeSessionId == null) {
+            viewModelScope.launch {
+                val session = repository.startSession(
+                    userId = activeUserId,
+                    username = activeUsername,
+                    plannedMinutes = selectedDuration,
+                    withMusic = withMusic,
+                    sessionType = "focus"
+                )
+                activeSessionId = session.sessionId
             }
-            if (withMusic) {
-                playFocusMusic()
-            }
-            startCountdown()
-            startQuoteRotation()
         }
+
+        if (withMusic) playFocusMusic()
+        startCountdown()
+        startQuoteRotation()
     }
 
     fun pauseTimer() {
-        if (timerState == TimerState.RUNNING) {
-            timerState = TimerState.PAUSED
-            timerJob?.cancel()
-            quoteJob?.cancel()
-            if (withMusic) {
-                stopFocusMusic()
-            }
-        }
+        if (timerState != TimerState.RUNNING) return
+        timerState = TimerState.PAUSED
+        timerJob?.cancel()
+        quoteJob?.cancel()
+        currentMotivationalQuote = ""
+        if (withMusic) stopFocusMusic()
     }
 
     fun resetTimer() {
+        // If the user resets while a session exists, mark it abandoned.
+        val sessionId = activeSessionId
+        if (sessionId != null && (timerState == TimerState.RUNNING || timerState == TimerState.PAUSED)) {
+            viewModelScope.launch {
+                repository.abandonSession(activeUserId, sessionId, reason = "left_early")
+            }
+        }
+
         timerJob?.cancel()
         quoteJob?.cancel()
+        stopFocusMusic()
+
+        activeSessionId = null
         timerState = TimerState.IDLE
         remainingSeconds = selectedDuration * 60
-        sessionStartTime = 0
         currentMotivationalQuote = ""
-        stopFocusMusic()
     }
 
     private fun startCountdown() {
+        timerJob?.cancel()
         timerJob = viewModelScope.launch {
             while (remainingSeconds > 0 && timerState == TimerState.RUNNING) {
                 delay(1000)
                 remainingSeconds--
             }
-            if (remainingSeconds == 0) {
+            if (remainingSeconds == 0 && timerState == TimerState.RUNNING) {
                 completeSession()
             }
         }
     }
 
     private fun startQuoteRotation() {
-        // Show first quote immediately
         currentMotivationalQuote = motivationalQuotes.random()
-
+        quoteJob?.cancel()
         quoteJob = viewModelScope.launch {
-            delay(15000) // Show first quote for 15 seconds
-            var quotesShown = 1
-
-            while (timerState == TimerState.RUNNING && quotesShown < 5) {
+            delay(15000)
+            var shown = 1
+            while (timerState == TimerState.RUNNING && shown < 5) {
                 currentMotivationalQuote = motivationalQuotes.random()
-                delay(20000) // Show each subsequent quote for 20 seconds
-                quotesShown++
+                delay(20000)
+                shown++
             }
-
-            // After showing 5 quotes, clear it
             currentMotivationalQuote = ""
         }
     }
@@ -212,18 +376,13 @@ class FocusViewModel @Inject constructor(
         currentMotivationalQuote = ""
         stopFocusMusic()
 
-        val session = FocusSession(
-            startTime = sessionStartTime,
-            endTime = System.currentTimeMillis(),
-            durationMinutes = selectedDuration,
-            completed = true,
-            date = getTodayDate(),
-            withMusic = withMusic
-        )
+        val sessionId = activeSessionId
+        activeSessionId = null
 
-        viewModelScope.launch {
-            focusSessionDao.insertSession(session)
-            loadStats()
+        if (sessionId != null) {
+            viewModelScope.launch {
+                repository.completeSession(activeUserId, sessionId)
+            }
         }
     }
 
@@ -231,84 +390,66 @@ class FocusViewModel @Inject constructor(
         resetTimer()
     }
 
-    private fun loadStats() {
-        viewModelScope.launch {
-            // Load today's minutes
-            val today = getTodayDate()
-            val todayMins = focusSessionDao.getTotalFocusMinutesForDate(today) ?: 0
-            _todayMinutes.value = todayMins
+    private fun recomputeStats(sessions: List<FocusSession>) {
+        val completed = sessions.filter { it.status == FocusSessionStatus.COMPLETED }
+        val today = getTodayDate()
 
-            // Load total minutes
-            val total = focusSessionDao.getTotalFocusMinutes() ?: 0
-            _totalMinutes.value = total
+        val todayTotal = completed
+            .filter { it.date == today }
+            .sumOf { it.actualDurationMinutes }
 
-            // Load weekly stats
-            loadWeeklyStats()
+        val total = completed.sumOf { it.actualDurationMinutes }
 
-            // Calculate streak
-            calculateStreak()
-
-            // Generate comparisons
-            generateComparisons(total)
-
-            // Generate leaderboard (mock data for now)
-            generateLeaderboard(total)
-        }
+        _todayMinutes.value = todayTotal
+        _totalMinutes.value = total
+        _weeklyStats.value = computeWeeklyStats(completed)
+        _currentStreak.value = computeStreak(completed)
+        _focusComparison.value = generateComparisons(total)
     }
 
-    private suspend fun loadWeeklyStats() {
+    private fun computeWeeklyStats(completed: List<FocusSession>): List<DailyFocusStats> {
         val calendar = Calendar.getInstance()
         val stats = mutableListOf<DailyFocusStats>()
 
         for (i in 6 downTo 0) {
-            val date = calendar.clone() as Calendar
-            date.add(Calendar.DAY_OF_YEAR, -i)
-            val dateString = formatDate(date.time)
+            val c = calendar.clone() as Calendar
+            c.add(Calendar.DAY_OF_YEAR, -i)
+            val dateStr = formatDate(c.time)
 
-            val minutes = focusSessionDao.getTotalFocusMinutesForDate(dateString) ?: 0
-            val sessions = focusSessionDao.getSessionCountForDate(dateString)
+            val mins = completed.filter { it.date == dateStr }.sumOf { it.actualDurationMinutes }
+            val sessionsCount = completed.count { it.date == dateStr }
 
             stats.add(
                 DailyFocusStats(
-                    date = dateString,
-                    totalMinutes = minutes,
-                    sessionsCompleted = sessions,
+                    date = dateStr,
+                    totalMinutes = mins,
+                    sessionsCompleted = sessionsCount,
                     streak = 0
                 )
             )
         }
-
-        _weeklyStats.value = stats
+        return stats
     }
 
-    private suspend fun calculateStreak() {
+    private fun computeStreak(completed: List<FocusSession>): Int {
         val calendar = Calendar.getInstance()
         var streak = 0
-        var currentDate = calendar.time
 
         while (true) {
-            val dateString = formatDate(currentDate)
-            val minutes = focusSessionDao.getTotalFocusMinutesForDate(dateString) ?: 0
-
-            if (minutes > 0) {
+            val dateStr = formatDate(calendar.time)
+            val mins = completed.filter { it.date == dateStr }.sumOf { it.actualDurationMinutes }
+            if (mins > 0) {
                 streak++
                 calendar.add(Calendar.DAY_OF_YEAR, -1)
-                currentDate = calendar.time
             } else {
                 break
             }
         }
-
-        _currentStreak.value = streak
+        return streak
     }
 
-    private fun generateComparisons(totalMinutes: Int) {
-        // Goldfish has ~9 second attention span
-        // Average human deep focus session: 25 minutes
-        // User's average session length
-        val goldfishMultiplier = (totalMinutes.toFloat() / 0.15f).toInt() // 9 seconds = 0.15 min
-
-        // Mock percentile based on total minutes (in real app, this comes from backend)
+    private fun generateComparisons(totalMinutes: Int): FocusComparison {
+        val goldfishMultiplier = (totalMinutes.toFloat() / 0.15f).toInt()
         val percentile = when {
             totalMinutes < 100 -> 30
             totalMinutes < 300 -> 50
@@ -318,7 +459,7 @@ class FocusViewModel @Inject constructor(
             else -> 98
         }
 
-        val comparison = FocusComparison(
+        return FocusComparison(
             userTotalMinutes = totalMinutes,
             attentionSpanComparison = when {
                 goldfishMultiplier < 10 -> "You're building focus! 🐠"
@@ -334,24 +475,6 @@ class FocusViewModel @Inject constructor(
                 else -> "Top $percentile%! Elite focus master! 👑"
             }
         )
-
-        _focusComparison.value = comparison
-    }
-
-    private fun generateLeaderboard(userMinutes: Int) {
-        // Mock leaderboard data (in production, fetch from Firebase/backend)
-        val mockLeaderboard = listOf(
-            LeaderboardEntry("FocusMaster", 2400, 1),
-            LeaderboardEntry("DeepWorker", 2100, 2),
-            LeaderboardEntry("ProductivityKing", 1950, 3),
-            LeaderboardEntry("ZenMonk", 1800, 4),
-            LeaderboardEntry("You", userMinutes, 5, true),
-            LeaderboardEntry("HustleMode", 1500, 6),
-            LeaderboardEntry("FlowState", 1350, 7)
-        ).sortedByDescending { it.totalMinutes }
-            .mapIndexed { index, entry -> entry.copy(rank = index + 1) }
-
-        _leaderboard.value = mockLeaderboard
     }
 
     fun getProgressPercentage(): Float {
@@ -365,13 +488,11 @@ class FocusViewModel @Inject constructor(
         return String.format("%02d:%02d", minutes, seconds)
     }
 
-    private fun getTodayDate(): String {
-        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
-    }
+    private fun getTodayDate(): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
 
-    private fun formatDate(date: Date): String {
-        return SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
-    }
+    private fun formatDate(date: Date): String =
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
 
     override fun onCleared() {
         super.onCleared()
@@ -379,5 +500,13 @@ class FocusViewModel @Inject constructor(
         quoteJob?.cancel()
         stopFocusMusic()
         mediaController?.release()
+
+        // Best-effort: mark current session abandoned if ViewModel is destroyed mid-run.
+        val sessionId = activeSessionId
+        if (sessionId != null && (timerState == TimerState.RUNNING || timerState == TimerState.PAUSED)) {
+            viewModelScope.launch {
+                repository.abandonSession(activeUserId, sessionId, reason = "app_closed")
+            }
+        }
     }
 }

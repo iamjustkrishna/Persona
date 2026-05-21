@@ -1,6 +1,7 @@
 package com.krishnajeena.persona.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.*
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -35,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -48,9 +50,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.krishnajeena.persona.data_layer.FocusSession
+import com.krishnajeena.persona.data_layer.FocusSessionStatus
 import com.krishnajeena.persona.data_layer.LeaderboardEntry
 import com.krishnajeena.persona.model.FocusViewModel
 import com.krishnajeena.persona.model.TimerState
+import com.krishnajeena.persona.model.TopPopupState
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -71,8 +76,11 @@ fun FocusScreen(
     val todayMinutes by viewModel.todayMinutes.collectAsState()
     val totalMinutes by viewModel.totalMinutes.collectAsState()
     val weeklyStats by viewModel.weeklyStats.collectAsState()
-    val focusComparison by viewModel.focusComparison.collectAsState()
+    val isLoggedIn by viewModel.isLoggedIn.collectAsState()
+    val topPopup by viewModel.topPopup.collectAsState()
     val leaderboard by viewModel.leaderboard.collectAsState()
+    val allTimeLeaderboard by viewModel.allTimeLeaderboard.collectAsState()
+    val allSessions by viewModel.allSessions.collectAsState()
     val currentStreak by viewModel.currentStreak.collectAsState()
 
     // Track focus mode state
@@ -361,13 +369,6 @@ fun FocusScreen(
             }
         }
 
-        // Comparison Stats
-        focusComparison?.let { comparison ->
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
-                ComparisonCard(comparison)
-            }
-        }
 
         // Weekly Calendar
         item {
@@ -383,8 +384,22 @@ fun FocusScreen(
             WeeklyCalendarView(weeklyStats)
         }
 
-        // Leaderboard
-        if (leaderboard.isNotEmpty()) {
+        // History (calendar-like) - private to user
+        item {
+            Spacer(modifier = Modifier.height(40.dp))
+            Text(
+                text = "History",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            MonthlyHistoryCalendar(allSessions)
+        }
+
+        if (isLoggedIn) {
+            // Leaderboard 1: Today's best (score includes penalty for abandoned sessions)
             item {
                 Spacer(modifier = Modifier.height(40.dp))
                 Row(
@@ -392,13 +407,10 @@ fun FocusScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "🏆",
-                            style = MaterialTheme.typography.headlineSmall
-                        )
+                        Text(text = "🏆", style = MaterialTheme.typography.headlineSmall)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Top Performers",
+                            text = "Today's Best",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground
@@ -406,7 +418,7 @@ fun FocusScreen(
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     Text(
-                        text = "This Week",
+                        text = "Score",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.Medium
@@ -415,48 +427,89 @@ fun FocusScreen(
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
-            itemsIndexed(leaderboard.take(7)) { index, entry ->
-                LeaderboardItem(entry, index)
-                if (index < 6) Spacer(modifier = Modifier.height(12.dp))
-            }
-        } else {
-            // Empty state for leaderboard
-            item {
-                Spacer(modifier = Modifier.height(32.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                    shape = RoundedCornerShape(20.dp),
-                    border = androidx.compose.foundation.BorderStroke(
-                        width = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+            if (leaderboard.isNotEmpty()) {
+                itemsIndexed(leaderboard.take(7)) { index, entry ->
+                    LeaderboardItem(entry, index)
+                    if (index < 6) Spacer(modifier = Modifier.height(12.dp))
+                }
+            } else {
+                item {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(20.dp),
+                        border = androidx.compose.foundation.BorderStroke(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant
+                        )
                     ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(text = "🚀", style = MaterialTheme.typography.displayMedium)
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "No data yet",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Complete a session today to appear here",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Leaderboard 2: All-time total focused time
+            item {
+                Spacer(modifier = Modifier.height(40.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "🔥", style = MaterialTheme.typography.headlineSmall)
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "🚀",
-                            style = MaterialTheme.typography.displayMedium
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Text(
-                            text = "Start your focus journey",
-                            style = MaterialTheme.typography.titleMedium,
+                            text = "All-Time Focus",
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Complete your first session to join the leaderboard",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center
+                            color = MaterialTheme.colorScheme.onBackground
                         )
                     }
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "Total minutes",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            if (allTimeLeaderboard.isNotEmpty()) {
+                itemsIndexed(allTimeLeaderboard.take(7)) { index, entry ->
+                    LeaderboardItem(entry, index)
+                    if (index < 6) Spacer(modifier = Modifier.height(12.dp))
+                }
+            } else {
+                item {
+                    Text(
+                        text = "Not enough data yet.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
@@ -465,6 +518,25 @@ fun FocusScreen(
             Spacer(modifier = Modifier.height(120.dp))
         }
             }
+        }
+
+        // Avoid NPE: during the exit animation, AnimatedVisibility can keep composing
+        // its content while `topPopup` has already been set to null.
+        val popupForExit = remember { mutableStateOf<TopPopupState?>(null) }
+        LaunchedEffect(topPopup) {
+            if (topPopup != null) popupForExit.value = topPopup
+        }
+
+        AnimatedVisibility(
+            visible = topPopup != null,
+            enter = slideInVertically(initialOffsetY = { -it / 2 }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
+                .padding(horizontal = 20.dp)
+        ) {
+            popupForExit.value?.let { TopPopupCard(popup = it) }
         }
 
         // Scroll Indicator - positioned above camera button
@@ -500,6 +572,36 @@ fun FocusScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun TopPopupCard(popup: TopPopupState) {
+    val (container, content) = when (popup.kind) {
+        TopPopupState.Kind.TOP_10 -> MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer
+        TopPopupState.Kind.TOP_30 -> MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = container,
+        shape = RoundedCornerShape(18.dp),
+        shadowElevation = 10.dp
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(
+                text = popup.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = content
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = popup.message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = content.copy(alpha = 0.9f)
+            )
         }
     }
 }
@@ -762,8 +864,14 @@ fun LeaderboardItem(entry: LeaderboardEntry, rank: Int) {
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(4.dp))
+                val showPenalty = entry.penaltyMinutes > 0 && entry.totalMinutes == entry.scoreMinutes
+                val subText = if (showPenalty) {
+                    "${entry.focusedMinutes}m focused • -${entry.penaltyMinutes}m penalty • ${entry.scoreMinutes}m score"
+                } else {
+                    "${entry.totalMinutes} minutes"
+                }
                 Text(
-                    text = "${entry.totalMinutes} minutes",
+                    text = subText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -789,18 +897,240 @@ fun LeaderboardItem(entry: LeaderboardEntry, rank: Int) {
 }
 
 @Composable
+fun MonthlyHistoryCalendar(
+    sessions: List<FocusSession>,
+    modifier: Modifier = Modifier
+) {
+    val monthStart = remember {
+        Calendar.getInstance().apply {
+            set(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+    }
+
+    val monthLabel = remember(monthStart.timeInMillis) {
+        SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(monthStart.time)
+    }
+
+    var selectedDate by remember {
+        mutableStateOf(SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()))
+    }
+
+    val daysInMonth = monthStart.getActualMaximum(Calendar.DAY_OF_MONTH)
+    val firstDow = monthStart.get(Calendar.DAY_OF_WEEK) // 1=Sun
+    val offset = (firstDow + 5) % 7 // Monday=0
+
+    val sessionsByDate = remember(sessions) { sessions.groupBy { it.date } }
+
+    Column(modifier = modifier.fillMaxWidth()) {
+        Text(
+            text = monthLabel,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            listOf("M", "T", "W", "T", "F", "S", "S").forEach { d ->
+                Text(
+                    text = d,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.width(32.dp),
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        val cells = offset + daysInMonth
+        val totalCells = if (cells % 7 == 0) cells else cells + (7 - (cells % 7))
+        val indices = (0 until totalCells).toList()
+        val weeks = indices.chunked(7)
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            weeks.forEach { week ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    week.forEach { idx ->
+                        if (idx < offset || idx >= offset + daysInMonth) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                            )
+                        } else {
+                            val day = idx - offset + 1
+                            val dayCal = (monthStart.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, day) }
+                            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(dayCal.time)
+
+                            val daySessions = sessionsByDate[dateStr].orEmpty()
+                            val completedMinutes = daySessions
+                                .filter { it.status == FocusSessionStatus.COMPLETED }
+                                .sumOf { it.actualDurationMinutes }
+                            val hasAbandoned = daySessions.any { it.status == FocusSessionStatus.ABANDONED }
+
+                            val dotColor = when {
+                                hasAbandoned -> MaterialTheme.colorScheme.error
+                                completedMinutes > 0 -> MaterialTheme.colorScheme.primary
+                                else -> MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)
+                            }
+
+                            val isSelected = selectedDate == dateStr
+
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .clickable { selectedDate = dateStr }
+                                    .background(
+                                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                                        else Color.Transparent
+                                    )
+                                    .padding(vertical = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = day.toString(),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .background(dotColor, CircleShape)
+                                )
+                                if (completedMinutes > 0) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "${completedMinutes}m",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        val selectedSessions = sessionsByDate[selectedDate].orEmpty().sortedByDescending { it.startTimeMs }
+        Text(
+            text = selectedDate,
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        if (selectedSessions.isEmpty()) {
+            Text(
+                text = "No sessions.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                selectedSessions.take(6).forEach { s ->
+                    SessionHistoryRow(s)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SessionHistoryRow(session: FocusSession) {
+    val time = remember(session.startTimeMs) {
+        SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(session.startTimeMs))
+    }
+
+    val statusColor = when (session.status) {
+        FocusSessionStatus.ABANDONED -> MaterialTheme.colorScheme.error
+        FocusSessionStatus.COMPLETED -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f),
+        shape = RoundedCornerShape(14.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(10.dp)
+                    .background(statusColor, CircleShape)
+            )
+            Spacer(modifier = Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "$time • ${session.actualDurationMinutes}/${session.plannedDurationMinutes}m",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                val label = if (session.status == FocusSessionStatus.ABANDONED) {
+                    "Abandoned" + (session.abandonedReason?.let { " • $it" } ?: "")
+                } else {
+                    "Completed"
+                }
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = session.status,
+                style = MaterialTheme.typography.labelMedium,
+                color = statusColor,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
+
+@Composable
 fun FocusedModeUI(
     formattedTime: String,
     progress: Float,
     motivationalQuote: String,
     onExit: () -> Unit
 ) {
+    val pulseScale by rememberInfiniteTransition(label = "focusPulse").animateFloat(
+        initialValue = 0.985f,
+        targetValue = 1.015f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1800, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseScale"
+    )
+
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
-    ) {
+    ) { 
+
         // Exit button at top left
         FilledTonalIconButton(
             onClick = onExit,
@@ -825,7 +1155,9 @@ fun FocusedModeUI(
         ) {
             // Large Timer
             Box(
-                modifier = Modifier.size(320.dp),
+                modifier = Modifier
+                    .size(320.dp)
+                    .scale(pulseScale),
                 contentAlignment = Alignment.Center
             ) {
                 // Background circle

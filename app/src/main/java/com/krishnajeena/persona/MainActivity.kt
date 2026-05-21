@@ -64,7 +64,7 @@ class MainActivity : ComponentActivity() {
             val systemDarkMode = isSystemInDarkTheme()
 
             // Update system dark mode when it changes
-            LaunchedEffect(systemDarkMode) {
+            LaunchedEffect(systemDarkMode, themeState.useSystemTheme) {
                 if (themeState.useSystemTheme) {
                     themeViewModel.updateSystemDarkMode(systemDarkMode)
                 }

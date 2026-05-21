@@ -774,7 +774,7 @@ fun LoginDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(32.dp),
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Google Icon
@@ -832,9 +832,11 @@ fun LoginDialog(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     ),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
                     enabled = !isLoading
                 ) {
                     Row(
+                        modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center
                     ) {
@@ -847,8 +849,11 @@ fun LoginDialog(
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = "Sign in with Google",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Clip
                         )
                     }
                 }

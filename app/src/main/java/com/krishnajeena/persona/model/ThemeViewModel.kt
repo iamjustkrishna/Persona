@@ -1,6 +1,5 @@
 package com.krishnajeena.persona.model
 
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.lifecycle.ViewModel
 import com.krishnajeena.persona.data_layer.AppTheme
 import com.krishnajeena.persona.data_layer.ThemeManager
@@ -13,7 +12,7 @@ import javax.inject.Inject
 data class ThemeState(
     val currentTheme: AppTheme = AppTheme.WARM_SUNSET,
     val isDarkMode: Boolean = false,
-    val useSystemTheme: Boolean = true
+    val useSystemTheme: Boolean = false
 )
 
 @HiltViewModel
@@ -25,7 +24,7 @@ class ThemeViewModel @Inject constructor(
         ThemeState(
             currentTheme = themeManager.getTheme(),
             isDarkMode = themeManager.isDarkMode(),
-            useSystemTheme = true
+            useSystemTheme = themeManager.useSystemTheme()
         )
     )
     val themeState: StateFlow<ThemeState> = _themeState.asStateFlow()
@@ -37,6 +36,7 @@ class ThemeViewModel @Inject constructor(
 
     fun setDarkMode(isDark: Boolean) {
         themeManager.saveDarkMode(isDark)
+        themeManager.saveUseSystemTheme(false)
         _themeState.value = _themeState.value.copy(
             isDarkMode = isDark,
             useSystemTheme = false
@@ -49,11 +49,13 @@ class ThemeViewModel @Inject constructor(
     }
 
     fun setUseSystemTheme(useSystem: Boolean) {
+        themeManager.saveUseSystemTheme(useSystem)
         _themeState.value = _themeState.value.copy(useSystemTheme = useSystem)
     }
 
     fun updateSystemDarkMode(isSystemDark: Boolean) {
         if (_themeState.value.useSystemTheme) {
+            themeManager.saveDarkMode(isSystemDark)
             _themeState.value = _themeState.value.copy(isDarkMode = isSystemDark)
         }
     }

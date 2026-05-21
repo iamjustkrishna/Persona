@@ -128,9 +128,6 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
 
-            <meta-data
-                android:name="com.krishnajeena.persona.other.WorkManagerInitializer"
-                android:value="androidx.startup" />
         </activity>
     </application>
 

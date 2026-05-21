@@ -7,19 +7,22 @@ import com.google.android.gms.auth.api.identity.BeginSignInRequest
 import com.google.android.gms.auth.api.identity.BeginSignInRequest.GoogleIdTokenRequestOptions
 import com.google.android.gms.auth.api.identity.SignInClient
 import com.google.android.gms.auth.api.identity.Identity
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.CancellationException
 
 class GoogleAuthUiClient(
     private val context: Context,
-    private val oneTapClient: SignInClient
+    private val oneTapClient: SignInClient,
+    private val firebaseAuth: FirebaseAuth
 ) {
     private val signInRequest = BeginSignInRequest.builder()
         .setGoogleIdTokenRequestOptions(
             GoogleIdTokenRequestOptions.builder()
                 .setSupported(true)
                 .setFilterByAuthorizedAccounts(false)
-                .setServerClientId("138146477718-352rpdrjsa3qu4hmbhfrc77ehhoo14hb.apps.googleusercontent.com") // Replace with your actual Web Client ID from Firebase
+                .setServerClientId("138146477718-t9bel2o2v9ua8aaq78mlk7o24gqgoivs.apps.googleusercontent.com") // Replace with your actual Web Client ID from Firebase
                 .build()
         )
         .setAutoSelectEnabled(true)
@@ -43,20 +46,37 @@ class GoogleAuthUiClient(
         val username = credential.displayName
         val profilePictureUrl = credential.profilePictureUri?.toString()
 
-        return SignInResult(
-            data = googleIdToken?.let {
-                UserData(
-                    userId = googleId,
-                    username = username,
-                    profilePictureUrl = profilePictureUrl
+        return try {
+            googleIdToken?.let { token ->
+                // Sign in to Firebase with Google ID token
+                val firebaseCredential = GoogleAuthProvider.getCredential(token, null)
+                firebaseAuth.signInWithCredential(firebaseCredential).await()
+                
+                SignInResult(
+                    data = UserData(
+                        userId = googleId,
+                        username = username,
+                        profilePictureUrl = profilePictureUrl
+                    ),
+                    errorMessage = null
                 )
-            },
-            errorMessage = null
-        )
+            } ?: SignInResult(
+                data = null,
+                errorMessage = "No Google ID token received"
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            if (e is CancellationException) throw e
+            SignInResult(
+                data = null,
+                errorMessage = "Firebase sign-in failed: ${e.message}"
+            )
+        }
     }
 
     suspend fun signOut() {
         try {
+            firebaseAuth.signOut()
             oneTapClient.signOut().await()
         } catch (e: Exception) {
             e.printStackTrace()

@@ -28,6 +28,7 @@ class ThemeManager @Inject constructor(
     companion object {
         private const val KEY_THEME = "app_theme"
         private const val KEY_DARK_MODE = "dark_mode"
+        private const val KEY_USE_SYSTEM_THEME = "use_system_theme"
     }
 
     fun saveTheme(theme: AppTheme) {
@@ -45,5 +46,13 @@ class ThemeManager @Inject constructor(
 
     fun isDarkMode(): Boolean {
         return prefs.getBoolean(KEY_DARK_MODE, false)
+    }
+
+    fun saveUseSystemTheme(useSystemTheme: Boolean) {
+        prefs.edit().putBoolean(KEY_USE_SYSTEM_THEME, useSystemTheme).apply()
+    }
+
+    fun useSystemTheme(): Boolean {
+        return prefs.getBoolean(KEY_USE_SYSTEM_THEME, false)
     }
 }

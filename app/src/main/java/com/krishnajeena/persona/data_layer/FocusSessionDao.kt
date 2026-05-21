@@ -1,42 +1,60 @@
 package com.krishnajeena.persona.data_layer
 
-import androidx.room.Dao
 import androidx.room.Insert
+import androidx.room.Dao
+import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @Dao
 interface FocusSessionDao {
 
-    @Insert
-    suspend fun insertSession(session: FocusSession)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSession(session: FocusSession)
 
-    @Query("SELECT * FROM focus_sessions WHERE completed = 1 ORDER BY startTime DESC")
-    fun getAllCompletedSessions(): Flow<List<FocusSession>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSessions(sessions: List<FocusSession>)
 
-    @Query("SELECT * FROM focus_sessions WHERE date = :date AND completed = 1")
-    suspend fun getSessionsForDate(date: String): List<FocusSession>
+    @Query("SELECT * FROM focus_sessions WHERE userId = :userId ORDER BY startTimeMs DESC")
+    fun observeAllSessions(userId: String): Flow<List<FocusSession>>
 
-    @Query("SELECT SUM(durationMinutes) FROM focus_sessions WHERE completed = 1")
-    suspend fun getTotalFocusMinutes(): Int?
+    @Query("SELECT * FROM focus_sessions WHERE userId = :userId AND status = :status ORDER BY startTimeMs DESC")
+    fun observeSessionsByStatus(userId: String, status: String): Flow<List<FocusSession>>
 
-    @Query("SELECT SUM(durationMinutes) FROM focus_sessions WHERE date = :date AND completed = 1")
-    suspend fun getTotalFocusMinutesForDate(date: String): Int?
+    @Query("SELECT * FROM focus_sessions WHERE sessionId = :sessionId LIMIT 1")
+    suspend fun getById(sessionId: String): FocusSession?
 
-    @Query("SELECT COUNT(*) FROM focus_sessions WHERE date = :date AND completed = 1")
-    suspend fun getSessionCountForDate(date: String): Int
+    @Query("SELECT * FROM focus_sessions WHERE userId = :userId AND status = 'IN_PROGRESS' ORDER BY startTimeMs DESC")
+    suspend fun getInProgressSessions(userId: String): List<FocusSession>
 
-    // Get last 7 days of sessions
-    @Query("SELECT * FROM focus_sessions WHERE date >= :startDate AND completed = 1 ORDER BY date DESC")
-    suspend fun getSessionsForDateRange(startDate: String): List<FocusSession>
+    @Query(
+        "UPDATE focus_sessions " +
+            "SET userId = :newUserId, username = :newUsername, syncStatus = :syncStatus, updatedAtMs = :updatedAtMs, syncedAtMs = NULL " +
+            "WHERE userId = :oldUserId"
+    )
+    suspend fun migrateUserSessions(
+        oldUserId: String,
+        newUserId: String,
+        newUsername: String,
+        syncStatus: String,
+        updatedAtMs: Long
+    )
 
-    // Get today's total minutes
-    @Query("SELECT SUM(durationMinutes) FROM focus_sessions WHERE date = :today AND completed = 1")
-    fun getTodayFocusMinutes(today: String): Flow<Int?>
+    @Query("SELECT SUM(actualDurationMinutes) FROM focus_sessions WHERE userId = :userId AND status = 'COMPLETED'")
+    suspend fun getTotalCompletedMinutes(userId: String): Int?
 
-    @Query("DELETE FROM focus_sessions")
-    suspend fun deleteAllSessions()
+    @Query("SELECT SUM(actualDurationMinutes) FROM focus_sessions WHERE userId = :userId AND date = :date AND status = 'COMPLETED'")
+    suspend fun getTotalCompletedMinutesForDate(userId: String, date: String): Int?
+
+    @Query("SELECT COUNT(*) FROM focus_sessions WHERE userId = :userId AND date = :date AND status = 'COMPLETED'")
+    suspend fun getCompletedSessionCountForDate(userId: String, date: String): Int
+
+    @Query("SELECT * FROM focus_sessions WHERE userId = :userId AND syncStatus != 'SYNCED' AND status != 'IN_PROGRESS' ORDER BY updatedAtMs ASC")
+    suspend fun getPendingSyncSessions(userId: String): List<FocusSession>
+
+    @Query("UPDATE focus_sessions SET syncStatus = :syncStatus, syncedAtMs = :syncedAtMs, updatedAtMs = :updatedAtMs WHERE sessionId = :sessionId")
+    suspend fun updateSyncStatus(sessionId: String, syncStatus: String, syncedAtMs: Long?, updatedAtMs: Long)
+
+    @Query("DELETE FROM focus_sessions WHERE userId = :userId AND status = 'IN_PROGRESS'")
+    suspend fun deleteAllInProgress(userId: String)
 }

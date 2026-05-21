@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     id("com.google.dagger.hilt.android")
+    id("com.google.gms.google-services")
     alias(libs.plugins.compose.compiler)
     id("org.jetbrains.kotlin.plugin.serialization") version "1.8.0"
     id("com.google.devtools.ksp")
@@ -15,8 +16,8 @@ android {
         applicationId = "com.krishnajeena.persona"
         minSdk = 29
         targetSdk = 35
-        versionCode = 30
-        versionName = "4.1.1"
+        versionCode = 32
+        versionName = "4.2.1"
         multiDexEnabled = true
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -160,6 +161,8 @@ dependencies {
 
     implementation(platform("com.google.firebase:firebase-bom:33.13.0"))
     implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
     implementation ("dev.shreyaspatil:capturable:2.1.0")
 
     // Google Sign-In
@@ -168,4 +171,3 @@ dependencies {
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 }
-

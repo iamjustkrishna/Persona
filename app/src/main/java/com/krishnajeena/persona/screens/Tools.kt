@@ -267,7 +267,6 @@ fun ToolDetailScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surface)
 //                    .windowInsetsPadding(WindowInsets.statusBars)
                     .height(56.dp)
                     .padding(horizontal = 4.dp),

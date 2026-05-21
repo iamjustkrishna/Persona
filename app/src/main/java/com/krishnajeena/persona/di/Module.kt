@@ -5,6 +5,11 @@ import android.content.Context
 import androidx.room.Room
 import com.google.android.gms.auth.api.identity.Identity
 import com.google.android.gms.auth.api.identity.SignInClient
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FirebaseFirestoreSettings
+import com.krishnajeena.persona.data_layer.FocusRepository
 import com.krishnajeena.persona.MusicDataSource
 import com.krishnajeena.persona.auth.GoogleAuthUiClient
 import com.krishnajeena.persona.components.MusicControllerImpl
@@ -98,11 +103,41 @@ object AppModule {
 
     @Provides
     @Singleton
+    fun provideFirebaseAuth(@ApplicationContext context: Context): FirebaseAuth {
+        FirebaseApp.initializeApp(context)
+        return FirebaseAuth.getInstance()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFirestore(@ApplicationContext context: Context): FirebaseFirestore {
+        FirebaseApp.initializeApp(context)
+        return FirebaseFirestore.getInstance().apply {
+            firestoreSettings = FirebaseFirestoreSettings.Builder()
+                .setPersistenceEnabled(true)
+                .build()
+        }
+    }
+
+    @Provides
+    @Singleton
+    fun provideFocusRepository(
+        focusSessionDao: com.krishnajeena.persona.data_layer.FocusSessionDao,
+        firestore: FirebaseFirestore,
+        firebaseAuth: FirebaseAuth,
+        @ApplicationContext context: Context
+    ): FocusRepository {
+        return FocusRepository(focusSessionDao, firestore, firebaseAuth, context)
+    }
+
+    @Provides
+    @Singleton
     fun provideGoogleAuthUiClient(
         @ApplicationContext context: Context,
-        oneTapClient: SignInClient
+        oneTapClient: SignInClient,
+        firebaseAuth: FirebaseAuth
     ): GoogleAuthUiClient {
-        return GoogleAuthUiClient(context, oneTapClient)
+        return GoogleAuthUiClient(context, oneTapClient, firebaseAuth)
     }
 
     @Provides
